@@ -8,13 +8,24 @@
 
         <!-- Custom WebSocket appender -->
         <WebSocketLogAppender name="WebSocket"/>
+
+        <!-- File appender for log capture -->
+        <RollingFile name="File" fileName="logs/chromascape.log"
+                     filePattern="logs/chromascape-%d{yyyy-MM-dd}-%i.log">
+            <PatternLayout pattern="%d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/>
+            <Policies>
+                <SizeBasedTriggeringPolicy size="10 MB"/>
+            </Policies>
+            <DefaultRolloverStrategy max="3"/>
+        </RollingFile>
     </Appenders>
 
     <Loggers>
-        <!-- Root logger sends logs to both console and WebSocket -->
+        <!-- Root logger sends logs to console, WebSocket, and file -->
         <Root level="info">
             <AppenderRef ref="Console"/>
             <AppenderRef ref="WebSocket"/>
+            <AppenderRef ref="File"/>
         </Root>
     </Loggers>
 </Configuration>
