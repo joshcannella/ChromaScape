@@ -37,6 +37,7 @@ public class SendScripts {
     try (Stream<Path> stream = Files.walk(SCRIPTS_DIR)) {
       return stream
           .filter(Files::isRegularFile)
+          .filter(path -> path.getFileName().toString().endsWith("Script.java"))
           .map(SCRIPTS_DIR::relativize)
           .map(path -> path.toString().replace("\\", "/"))
           .sorted()
