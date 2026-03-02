@@ -1,4 +1,4 @@
-package com.scriptgen.scripts;
+package com.chromascape.scripts;
 
 import com.chromascape.api.DiscordNotification;
 import com.chromascape.base.BaseScript;
