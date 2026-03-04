@@ -25,21 +25,22 @@ public class RestlessGhostScript extends BaseScript {
 
   private static final Logger logger = LogManager.getLogger(RestlessGhostScript.class);
 
-  // === Image Templates ===
   private static final String AMULET_IMAGE = "/images/user/Ghostspeak_amulet.png";
   private static final String SKULL_IMAGE = "/images/user/Ghosts_skull.png";
-
   private static final double MATCH_THRESHOLD = 0.07;
 
-  // === Walker Destinations ===
   private static final Point AERECK_TILE = new Point(3243, 3210);
   private static final Point URHNEY_TILE = new Point(3147, 3175);
   private static final Point COFFIN_TILE = new Point(3250, 3193);
   private static final Point TOWER_ENTRANCE_TILE = new Point(3109, 3162);
   private static final Point ALTAR_TILE = new Point(3120, 9567);
 
+  private static final Point CHURCH_DOOR_TILE = new Point(3244, 3204);
+
   private enum Step {
+    ENTER_CHURCH,
     TALK_AERECK,
+    WALK_TO_URHNEY,
     TALK_URHNEY,
     EQUIP_AMULET,
     OPEN_COFFIN,
@@ -53,7 +54,7 @@ public class RestlessGhostScript extends BaseScript {
     DONE
   }
 
-  private Step step = Step.TALK_AERECK;
+  private Step step = Step.ENTER_CHURCH;
 
   @Override
   protected void cycle() {
@@ -78,46 +79,55 @@ public class RestlessGhostScript extends BaseScript {
     logger.info("Step: {}", step);
 
     switch (step) {
+      case ENTER_CHURCH -> {
+        walkTo(CHURCH_DOOR_TILE, "church door");
+        clickGameCenter();
+        waitMillis(HumanBehavior.adjustDelay(1500, 2500));
+        step = Step.TALK_AERECK;
+      }
       case TALK_AERECK -> {
         walkTo(AERECK_TILE, "Father Aereck");
         clickGameCenter();
         waitMillis(HumanBehavior.adjustDelay(1500, 2500));
-        // "I'm looking for a quest!" is option 3
         pressSpace();
         waitMillis(HumanBehavior.adjustDelay(800, 1200));
         pressKey('3');
         waitMillis(HumanBehavior.adjustDelay(1500, 2500));
-        // "Ok, let me help." is option 1
         pressKey('1');
         waitMillis(HumanBehavior.adjustDelay(1500, 2500));
-        // Space through remaining dialogue
         for (int i = 0; i < 5; i++) {
           checkInterrupted();
           pressSpace();
           waitMillis(HumanBehavior.adjustDelay(800, 1200));
         }
+        // Don't jump straight to TALK_URHNEY — walk first, then talk separately
+        step = Step.WALK_TO_URHNEY;
+      }
+      case WALK_TO_URHNEY -> {
+        // Separated from TALK_URHNEY so the walk completes before we attempt dialog.
+        // If we already have the amulet, skipCompletedSteps will jump past this.
+        walkTo(URHNEY_TILE, "Father Urhney");
         step = Step.TALK_URHNEY;
       }
       case TALK_URHNEY -> {
         if (!hasItem(AMULET_IMAGE)) {
-          walkTo(URHNEY_TILE, "Father Urhney");
           // Click to open door (or talk if already open)
           clickGameCenter();
           waitMillis(HumanBehavior.adjustDelay(1500, 2500));
           // Click again to talk to Urhney
           clickGameCenter();
           waitMillis(HumanBehavior.adjustDelay(1500, 2500));
-          // "Father Aereck sent me to talk to you." is option 2
           pressSpace();
           waitMillis(HumanBehavior.adjustDelay(800, 1200));
           pressKey('2');
           waitMillis(HumanBehavior.adjustDelay(1500, 2500));
-          // Space through remaining dialogue until amulet received
           for (int i = 0; i < 6; i++) {
             checkInterrupted();
             pressSpace();
             waitMillis(HumanBehavior.adjustDelay(800, 1200));
           }
+          // Do NOT advance here — let the next cycle's hasItem check confirm we got the amulet.
+          // If dialog failed, the cycle retries the click+dialog naturally.
         } else {
           step = Step.EQUIP_AMULET;
         }
@@ -127,7 +137,6 @@ public class RestlessGhostScript extends BaseScript {
           clickInventoryItem(AMULET_IMAGE);
           waitMillis(HumanBehavior.adjustDelay(600, 1000));
         }
-        // Amulet gone from inventory means it's equipped
         if (!hasItem(AMULET_IMAGE)) {
           step = Step.OPEN_COFFIN;
         }
@@ -141,7 +150,6 @@ public class RestlessGhostScript extends BaseScript {
       case TALK_GHOST -> {
         clickGameCenter();
         waitMillis(HumanBehavior.adjustDelay(1500, 2500));
-        // Space through all ghost dialogue
         for (int i = 0; i < 8; i++) {
           checkInterrupted();
           pressSpace();
@@ -163,9 +171,9 @@ public class RestlessGhostScript extends BaseScript {
           walkTo(ALTAR_TILE, "altar");
           clickGameCenter();
           waitMillis(HumanBehavior.adjustDelay(1500, 2500));
-          // Press space if any dialogue/warning appears
           pressSpace();
           waitMillis(HumanBehavior.adjustDelay(800, 1200));
+          // Don't advance — let next cycle's hasItem check confirm skull pickup
         } else {
           step = Step.ASCEND_TOWER;
         }
@@ -181,20 +189,17 @@ public class RestlessGhostScript extends BaseScript {
       }
       case USE_SKULL -> {
         if (hasItem(SKULL_IMAGE)) {
-          // Click skull in inventory to activate "use" cursor
           clickInventoryItem(SKULL_IMAGE);
           waitMillis(HumanBehavior.adjustDelay(300, 500));
-          // Click coffin to use skull on it
           clickGameCenter();
           waitMillis(HumanBehavior.adjustDelay(2000, 3000));
-          // Space through quest completion dialogue
           for (int i = 0; i < 5; i++) {
             checkInterrupted();
             pressSpace();
             waitMillis(HumanBehavior.adjustDelay(800, 1200));
           }
-        }
-        if (!hasItem(SKULL_IMAGE)) {
+          // Don't advance — let next cycle's hasItem check confirm skull is gone
+        } else {
           step = Step.DONE;
         }
       }
