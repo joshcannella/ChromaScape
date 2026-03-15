@@ -17,6 +17,7 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.bytedeco.opencv.opencv_core.Scalar;
@@ -230,12 +231,10 @@ public class ChickenKillerScript extends BaseScript {
     }
     try {
       Rectangle box = ColourContours.getChromaObjClosestToCentre(objs).boundingBox();
-      // Shrink bounding box by 25% on each side to avoid clicking outside the tile
-      int shrinkX = box.width / 4;
-      int shrinkY = box.height / 4;
-      Rectangle tight = new Rectangle(box.x + shrinkX, box.y + shrinkY,
-          box.width - shrinkX * 2, box.height - shrinkY * 2);
-      return ClickDistribution.generateRandomPoint(tight);
+      // Click near center with small random offset to stay on the tile
+      int cx = box.x + box.width / 2 + ThreadLocalRandom.current().nextInt(-2, 3);
+      int cy = box.y + box.height / 2 + ThreadLocalRandom.current().nextInt(-2, 3);
+      return new Point(cx, cy);
     } catch (Exception e) {
       logger.warn("Failed to generate point for ground item: {}", e.getMessage());
       return null;
