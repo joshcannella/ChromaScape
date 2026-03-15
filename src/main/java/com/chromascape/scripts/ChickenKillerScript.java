@@ -50,6 +50,7 @@ public class ChickenKillerScript extends BaseScript {
       new ColourObj("purple", new Scalar(140, 237, 205, 0), new Scalar(142, 255, 255, 0));
 
   private static final int BONES_BURY_THRESHOLD = 20;
+  private static final int LOOT_EVERY_N_KILLS = 5;
   private static final double INVENTORY_THRESHOLD = 0.07;
 
   // === Walker ===
@@ -61,6 +62,7 @@ public class ChickenKillerScript extends BaseScript {
   private static final int CHICKEN_XP = 12; // 3 HP × 4 XP per damage
   private static final int MAX_COMBAT_FAILURES = 10;
   private int combatFailures = 0;
+  private int killsSinceLoot = 0;
 
   // === Attack Style Rotation ===
   private static final int LEVELS_PER_ROTATION_STR = 2;
@@ -152,8 +154,12 @@ public class ChickenKillerScript extends BaseScript {
         int currentXp = Minimap.getXp(this);
         if (currentXp - previousXp >= CHICKEN_XP) {
           logger.info("Kill confirmed via XP (+{})", currentXp - previousXp);
+          killsSinceLoot++;
           waitMillis(HumanBehavior.adjustDelay(300, 600));
-          state = State.LOOT;
+          if (killsSinceLoot >= LOOT_EVERY_N_KILLS) {
+            state = State.LOOT;
+            killsSinceLoot = 0;
+          }
           return;
         }
       } catch (Exception e) {
