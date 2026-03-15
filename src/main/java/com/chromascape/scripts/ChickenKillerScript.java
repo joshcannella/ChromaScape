@@ -3,10 +3,10 @@ package com.chromascape.scripts;
 import com.chromascape.api.DiscordNotification;
 import com.chromascape.base.BaseScript;
 import com.chromascape.utils.actions.Idler;
-import com.chromascape.utils.actions.PointSelector;
 import com.chromascape.utils.core.input.distribution.ClickDistribution;
 import com.chromascape.utils.core.screen.colour.ColourObj;
 import com.chromascape.utils.core.screen.topology.ColourContours;
+import com.chromascape.utils.core.screen.topology.ChromaObj;
 import com.chromascape.utils.core.screen.topology.TemplateMatching;
 import com.chromascape.utils.core.screen.window.ScreenManager;
 import com.chromascape.scripts.HumanBehavior;
@@ -14,6 +14,7 @@ import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.util.List;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.bytedeco.opencv.opencv_core.Scalar;
@@ -122,7 +123,23 @@ public class ChickenKillerScript extends BaseScript {
 
   private void findChicken() {
     BufferedImage gameView = controller().zones().getGameView();
-    Point chickenLoc = PointSelector.getRandomPointByColourObj(gameView, CHICKEN_COLOUR, 15);
+
+    // Pre-check: verify contours exist and are valid before calling PointSelector
+    // PointSelector can crash with OpenCV assertion if contour Mat is empty/invalid
+    List<ChromaObj> objs = ColourContours.getChromaObjsInColour(gameView, CHICKEN_COLOUR);
+    Point chickenLoc = null;
+    if (!objs.isEmpty()) {
+      try {
+        chickenLoc = ClickDistribution.generateRandomPoint(
+            ColourContours.getChromaObjClosestToCentre(objs).boundingBox());
+      } catch (Exception e) {
+        logger.warn("Failed to generate click point from contour: {}", e.getMessage());
+      } finally {
+        for (ChromaObj obj : objs) {
+          obj.release();
+        }
+      }
+    }
 
     if (chickenLoc == null) {
       logger.warn("No chicken found, failure {}/{}", combatFailures + 1, MAX_COMBAT_FAILURES);
