@@ -29,8 +29,7 @@ import org.bytedeco.opencv.opencv_core.Scalar;
  * <p><b>RuneLite Setup:</b>
  * <ul>
  *   <li>NPC Indicators — highlight "Chicken" in cyan (HSV ~90, 254-255, 254-255)</li>
- *   <li>Ground Items — highlight "Feather" in yellow (HSV ~30, 254-255, 254-255)</li>
- *   <li>Ground Items — highlight "Bones" in magenta (HSV ~150, 254-255, 254-255)</li>
+ *   <li>Ground Items — highlight "Feather" and "Bones" in purple (HSV ~150, 254-255, 254-255)</li>
  *   <li>Idle Notifier — enabled (required for combat idle detection)</li>
  *   <li>Windows Display Scaling: 100%</li>
  *   <li>RuneScape UI: "Fixed - Classic"</li>
@@ -49,12 +48,9 @@ public class ChickenKillerScript extends BaseScript {
   // Chicken NPC highlight — configure RuneLite NPC Indicators to cyan
   private static final ColourObj CHICKEN_COLOUR =
       new ColourObj("cyan", new Scalar(90, 254, 254, 0), new Scalar(91, 255, 255, 0));
-  // Ground Items plugin — highlight "Feather" in yellow
-  private static final ColourObj FEATHER_COLOUR =
-      new ColourObj("yellow", new Scalar(30, 254, 254, 0), new Scalar(31, 255, 255, 0));
-  // Ground Items plugin — highlight "Bones" in magenta
-  private static final ColourObj BONES_COLOUR =
-      new ColourObj("magenta", new Scalar(150, 254, 254, 0), new Scalar(151, 255, 255, 0));
+  // Ground Items plugin — highlight "Feather" and "Bones" in purple
+  private static final ColourObj LOOT_COLOUR =
+      new ColourObj("purple", new Scalar(150, 254, 254, 0), new Scalar(151, 255, 255, 0));
 
   // === Thresholds ===
   private static final double INVENTORY_THRESHOLD = 0.07;
@@ -82,7 +78,7 @@ public class ChickenKillerScript extends BaseScript {
   private int lastTrackedLevel = -1;
 
   // === State Machine ===
-  private enum State { FIND_CHICKEN, WAIT_FOR_KILL, LOOT_FEATHERS, LOOT_BONES, BURY_BONES }
+  private enum State { FIND_CHICKEN, WAIT_FOR_KILL, LOOT, BURY_BONES }
 
   private State state = State.FIND_CHICKEN;
 
@@ -117,8 +113,7 @@ public class ChickenKillerScript extends BaseScript {
     switch (state) {
       case FIND_CHICKEN -> findChicken();
       case WAIT_FOR_KILL -> waitForKill();
-      case LOOT_FEATHERS -> lootFeathers();
-      case LOOT_BONES -> lootBones();
+      case LOOT -> loot();
       case BURY_BONES -> buryBones();
     }
   }
@@ -180,39 +175,22 @@ public class ChickenKillerScript extends BaseScript {
     }
     // Brief post-kill delay to simulate noticing the drop
     waitMillis(HumanBehavior.adjustDelay(400, 800));
-    state = State.LOOT_FEATHERS;
+    state = State.LOOT;
   }
 
-  private void lootFeathers() {
-    Point featherLoc = findGroundItemByColour(FEATHER_COLOUR);
-    if (featherLoc != null) {
-      clickPoint(featherLoc);
+  private void loot() {
+    // Click all purple-highlighted ground items (feathers + bones)
+    Point lootLoc = findGroundItemByColour(LOOT_COLOUR);
+    if (lootLoc != null) {
+      clickPoint(lootLoc);
       waitMillis(HumanBehavior.adjustDelay(800, 1200));
-    } else {
-      logger.info("No feathers on ground, skipping");
-    }
-    state = State.LOOT_BONES;
-  }
-
-  private void lootBones() {
-    if (hasItem(BONES_IMAGE)) {
-      state = State.BURY_BONES;
+      // Stay in LOOT state to pick up remaining items next cycle
       return;
     }
-
-    Point bonesLoc = findGroundItemByColour(BONES_COLOUR);
-    if (bonesLoc != null) {
-      clickPoint(bonesLoc);
-      // Wait for pickup animation then verify
-      waitMillis(HumanBehavior.adjustDelay(800, 1200));
-      if (hasItem(BONES_IMAGE)) {
-        state = State.BURY_BONES;
-      } else {
-        logger.info("Bones pickup failed, retrying next cycle");
-        state = State.FIND_CHICKEN;
-      }
+    // Nothing left on ground — bury bones if we have any
+    if (hasItem(BONES_IMAGE)) {
+      state = State.BURY_BONES;
     } else {
-      logger.info("No bones on ground, skipping");
       checkStyleRotation();
       state = State.FIND_CHICKEN;
     }
