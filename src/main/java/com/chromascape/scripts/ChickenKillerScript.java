@@ -226,11 +226,27 @@ public class ChickenKillerScript extends BaseScript {
 
   private Point findGroundItemByColour(ColourObj colour) {
     BufferedImage gameView = controller().zones().getGameView();
-    try {
-      return PointSelector.getRandomPointByColourObj(gameView, colour, 15, 15.0);
-    } catch (Exception e) {
-      logger.warn("PointSelector failed for ground item: {}", e.getMessage());
+    List<ChromaObj> objs = ColourContours.getChromaObjsInColour(gameView, colour);
+    if (objs.isEmpty()) {
       return null;
+    }
+    try {
+      // Pick the smallest contour to avoid merged adjacent tiles
+      ChromaObj smallest = objs.get(0);
+      for (ChromaObj obj : objs) {
+        if (obj.boundingBox().width * obj.boundingBox().height
+            < smallest.boundingBox().width * smallest.boundingBox().height) {
+          smallest = obj;
+        }
+      }
+      return ClickDistribution.generateRandomPoint(smallest.boundingBox(), 15.0);
+    } catch (Exception e) {
+      logger.warn("Failed to generate loot point: {}", e.getMessage());
+      return null;
+    } finally {
+      for (ChromaObj obj : objs) {
+        obj.release();
+      }
     }
   }
 
