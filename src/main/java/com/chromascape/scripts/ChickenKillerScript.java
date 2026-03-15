@@ -4,6 +4,7 @@ import com.chromascape.api.DiscordNotification;
 import com.chromascape.base.BaseScript;
 import com.chromascape.utils.actions.Minimap;
 import com.chromascape.utils.actions.MovingObject;
+import com.chromascape.utils.actions.PointSelector;
 import com.chromascape.utils.core.input.distribution.ClickDistribution;
 import com.chromascape.utils.core.screen.colour.ColourObj;
 import com.chromascape.utils.core.screen.topology.ChromaObj;
@@ -17,7 +18,6 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.concurrent.ThreadLocalRandom;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.bytedeco.opencv.opencv_core.Scalar;
@@ -226,23 +226,11 @@ public class ChickenKillerScript extends BaseScript {
 
   private Point findGroundItemByColour(ColourObj colour) {
     BufferedImage gameView = controller().zones().getGameView();
-    List<ChromaObj> objs = ColourContours.getChromaObjsInColour(gameView, colour);
-    if (objs.isEmpty()) {
-      return null;
-    }
     try {
-      Rectangle box = ColourContours.getChromaObjClosestToCentre(objs).boundingBox();
-      // Click near center with small random offset to stay on the tile
-      int cx = box.x + box.width / 2 + ThreadLocalRandom.current().nextInt(-2, 3);
-      int cy = box.y + box.height / 2 + ThreadLocalRandom.current().nextInt(-2, 3);
-      return new Point(cx, cy);
+      return PointSelector.getRandomPointByColourObj(gameView, colour, 15, 15.0);
     } catch (Exception e) {
-      logger.warn("Failed to generate point for ground item: {}", e.getMessage());
+      logger.warn("PointSelector failed for ground item: {}", e.getMessage());
       return null;
-    } finally {
-      for (ChromaObj obj : objs) {
-        obj.release();
-      }
     }
   }
 
