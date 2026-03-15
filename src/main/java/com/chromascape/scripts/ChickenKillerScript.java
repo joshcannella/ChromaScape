@@ -2,7 +2,6 @@ package com.chromascape.scripts;
 
 import com.chromascape.api.DiscordNotification;
 import com.chromascape.base.BaseScript;
-import com.chromascape.utils.actions.Minimap;
 import com.chromascape.utils.actions.MovingObject;
 import com.chromascape.utils.core.input.distribution.ClickDistribution;
 import com.chromascape.utils.core.screen.colour.ColourObj;
@@ -113,15 +112,6 @@ public class ChickenKillerScript extends BaseScript {
    * to confirm the kill. This is the same proven pattern used by the agility script.
    */
   private void fight() {
-    // Snapshot XP before attacking
-    int previousXp;
-    try {
-      previousXp = Minimap.getXp(this);
-    } catch (Exception e) {
-      logger.warn("Could not read XP, retrying next cycle");
-      return;
-    }
-
     // Check if a chicken is visible
     if (!isColourVisible(CHICKEN_COLOUR)) {
       logger.warn("No chicken found, failure {}/{}", combatFailures + 1, MAX_COMBAT_FAILURES);
@@ -146,12 +136,20 @@ public class ChickenKillerScript extends BaseScript {
     combatFailures = 0;
     logger.info("Attacked chicken, waiting for kill...");
 
-    // Wait for XP to change = kill confirmed
-    waitUntilXpChange(previousXp);
+    // Wait until loot appears (chicken died) or timeout (stolen/failed)
+    LocalDateTime deadline = LocalDateTime.now().plusSeconds(XP_TIMEOUT_SECONDS);
+    while (LocalDateTime.now().isBefore(deadline)) {
+      if (isColourVisible(LOOT_COLOUR)) {
+        logger.info("Loot detected — chicken killed");
+        waitMillis(HumanBehavior.adjustDelay(300, 600));
+        state = State.LOOT;
+        return;
+      }
+      waitMillis(300);
+    }
 
-    // Brief delay for loot to render on ground
-    waitMillis(HumanBehavior.adjustDelay(600, 1000));
-    state = State.LOOT;
+    // Timed out — chicken was stolen or we failed, try again
+    logger.info("Kill timeout — retrying");
   }
 
   private void loot() {
@@ -189,23 +187,6 @@ public class ChickenKillerScript extends BaseScript {
     }
     checkStyleRotation();
     state = State.FIGHT;
-  }
-
-  // === XP Tracking ===
-
-  private void waitUntilXpChange(int previousXp) {
-    LocalDateTime deadline = LocalDateTime.now().plusSeconds(XP_TIMEOUT_SECONDS);
-    while (LocalDateTime.now().isBefore(deadline)) {
-      try {
-        int currentXp = Minimap.getXp(this);
-        if (currentXp != previousXp) {
-          return;
-        }
-      } catch (Exception e) {
-        // OCR may fail intermittently — just retry
-      }
-      waitMillis(300);
-    }
   }
 
   // === Colour Utilities ===
