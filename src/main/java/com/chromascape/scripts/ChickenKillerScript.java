@@ -49,7 +49,7 @@ public class ChickenKillerScript extends BaseScript {
   private static final ColourObj LOOT_COLOUR =
       new ColourObj("purple", new Scalar(141, 127, 113, 0), new Scalar(153, 255, 219, 0));
 
-  // === Thresholds ===
+  private static final int BONES_BURY_THRESHOLD = 20;
   private static final double INVENTORY_THRESHOLD = 0.07;
 
   // === Walker ===
@@ -94,8 +94,8 @@ public class ChickenKillerScript extends BaseScript {
 
     dismissLevelUp();
 
-    // If inventory full with bones, bury first
-    if (isInventoryFull() && hasItem(BONES_IMAGE)) {
+    // If we have enough bones, bury them
+    if (countBones() >= BONES_BURY_THRESHOLD) {
       state = State.BURY_BONES;
     }
 
@@ -173,7 +173,7 @@ public class ChickenKillerScript extends BaseScript {
     }
 
     // Nothing left — bury bones only if inventory is full
-    if (isInventoryFull() && hasItem(BONES_IMAGE)) {
+    if (countBones() >= BONES_BURY_THRESHOLD) {
       state = State.BURY_BONES;
     } else {
       checkStyleRotation();
@@ -241,13 +241,16 @@ public class ChickenKillerScript extends BaseScript {
 
   // === Inventory Utilities ===
 
-  private boolean isInventoryFull() {
-    // Check last inventory slot — if occupied, inventory is full
-    Rectangle lastSlot = controller().zones().getInventorySlots().get(27);
-    BufferedImage slotImg = ScreenManager.captureZone(lastSlot);
-    // Empty slots have very little colour saturation; any item will have saturated pixels
-    return !ColourContours.getChromaObjsInColour(slotImg,
-        new ColourObj("item", new Scalar(0, 30, 30, 0), new Scalar(180, 255, 255, 0))).isEmpty();
+  private int countBones() {
+    int count = 0;
+    for (int i = 0; i < 28; i++) {
+      Rectangle slot = controller().zones().getInventorySlots().get(i);
+      BufferedImage slotImg = ScreenManager.captureZone(slot);
+      if (TemplateMatching.match(BONES_IMAGE, slotImg, INVENTORY_THRESHOLD).success()) {
+        count++;
+      }
+    }
+    return count;
   }
 
   private boolean hasItem(String templatePath) {
