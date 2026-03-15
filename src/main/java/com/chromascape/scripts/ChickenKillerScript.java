@@ -94,8 +94,8 @@ public class ChickenKillerScript extends BaseScript {
 
     dismissLevelUp();
 
-    // If we have bones from a previous cycle, bury first
-    if (hasItem(BONES_IMAGE)) {
+    // If inventory full with bones, bury first
+    if (isInventoryFull() && hasItem(BONES_IMAGE)) {
       state = State.BURY_BONES;
     }
 
@@ -170,8 +170,8 @@ public class ChickenKillerScript extends BaseScript {
       return;
     }
 
-    // Nothing left — check for bones to bury
-    if (hasItem(BONES_IMAGE)) {
+    // Nothing left — bury bones only if inventory is full
+    if (isInventoryFull() && hasItem(BONES_IMAGE)) {
       state = State.BURY_BONES;
     } else {
       checkStyleRotation();
@@ -180,13 +180,11 @@ public class ChickenKillerScript extends BaseScript {
   }
 
   private void buryBones() {
-    if (!hasItem(BONES_IMAGE)) {
-      checkStyleRotation();
-      state = State.FIGHT;
-      return;
+    // Bury all bones in inventory
+    while (hasItem(BONES_IMAGE)) {
+      clickInventoryItem(BONES_IMAGE);
+      waitMillis(HumanBehavior.adjustDelay(1200, 1600));
     }
-    clickInventoryItem(BONES_IMAGE);
-    waitMillis(HumanBehavior.adjustDelay(1200, 1600));
     checkStyleRotation();
     state = State.FIGHT;
   }
@@ -232,6 +230,15 @@ public class ChickenKillerScript extends BaseScript {
   }
 
   // === Inventory Utilities ===
+
+  private boolean isInventoryFull() {
+    // Check last inventory slot — if occupied, inventory is full
+    Rectangle lastSlot = controller().zones().getInventorySlots().get(27);
+    BufferedImage slotImg = ScreenManager.captureZone(lastSlot);
+    // Empty slots have very little colour saturation; any item will have saturated pixels
+    return !ColourContours.getChromaObjsInColour(slotImg,
+        new ColourObj("item", new Scalar(0, 30, 30, 0), new Scalar(180, 255, 255, 0))).isEmpty();
+  }
 
   private boolean hasItem(String templatePath) {
     for (int i = 0; i < 28; i++) {
