@@ -2,6 +2,7 @@ package com.chromascape.scripts;
 
 import com.chromascape.api.DiscordNotification;
 import com.chromascape.base.BaseScript;
+import com.chromascape.utils.actions.Minimap;
 import com.chromascape.utils.actions.MovingObject;
 import com.chromascape.utils.core.input.distribution.ClickDistribution;
 import com.chromascape.utils.core.screen.colour.ColourObj;
@@ -55,8 +56,9 @@ public class ChickenKillerScript extends BaseScript {
   private static final Point COOP_CENTER = new Point(3235, 3295);
 
   // === Timeouts ===
-  private static final int XP_TIMEOUT_SECONDS = 15;
+  private static final int KILL_TIMEOUT_SECONDS = 15;
   private static final int LOOT_APPEAR_TIMEOUT_SECONDS = 3;
+  private static final int CHICKEN_XP = 12; // 3 HP × 4 XP per damage
   private static final int MAX_COMBAT_FAILURES = 10;
   private int combatFailures = 0;
 
@@ -127,6 +129,12 @@ public class ChickenKillerScript extends BaseScript {
     }
 
     // Click the chicken — MovingObject handles retries and red-click verification
+    int previousXp = -1;
+    try {
+      previousXp = Minimap.getXp(this);
+    } catch (Exception e) {
+      // If OCR fails, we'll fall back to timeout
+    }
     if (!MovingObject.clickMovingObjectByColourObjUntilRedClick(CHICKEN_COLOUR, this)) {
       logger.warn("Failed to red-click chicken");
       combatFailures++;
@@ -136,14 +144,20 @@ public class ChickenKillerScript extends BaseScript {
     combatFailures = 0;
     logger.info("Attacked chicken, waiting for kill...");
 
-    // Wait until loot appears (chicken died) or timeout (stolen/failed)
-    LocalDateTime deadline = LocalDateTime.now().plusSeconds(XP_TIMEOUT_SECONDS);
+    // Wait until we gain at least 12 XP (one chicken kill: 3 HP × 4 XP)
+    // This avoids false positives from other players' loot already on the ground
+    LocalDateTime deadline = LocalDateTime.now().plusSeconds(KILL_TIMEOUT_SECONDS);
     while (LocalDateTime.now().isBefore(deadline)) {
-      if (isColourVisible(LOOT_COLOUR)) {
-        logger.info("Loot detected — chicken killed");
-        waitMillis(HumanBehavior.adjustDelay(300, 600));
-        state = State.LOOT;
-        return;
+      try {
+        int currentXp = Minimap.getXp(this);
+        if (currentXp - previousXp >= CHICKEN_XP) {
+          logger.info("Kill confirmed via XP (+{})", currentXp - previousXp);
+          waitMillis(HumanBehavior.adjustDelay(300, 600));
+          state = State.LOOT;
+          return;
+        }
+      } catch (Exception e) {
+        // OCR misread — keep polling
       }
       waitMillis(300);
     }
