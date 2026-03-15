@@ -47,7 +47,7 @@ public class ChickenKillerScript extends BaseScript {
   private static final ColourObj CHICKEN_COLOUR =
       new ColourObj("cyan", new Scalar(90, 254, 254, 0), new Scalar(91, 255, 255, 0));
   private static final ColourObj LOOT_COLOUR =
-      new ColourObj("purple", new Scalar(140, 200, 200, 0), new Scalar(160, 255, 255, 0));
+      new ColourObj("purple", new Scalar(141, 127, 113, 0), new Scalar(153, 255, 219, 0));
 
   // === Thresholds ===
   private static final double INVENTORY_THRESHOLD = 0.07;
