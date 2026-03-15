@@ -229,8 +229,13 @@ public class ChickenKillerScript extends BaseScript {
       return null;
     }
     try {
-      return ClickDistribution.generateRandomPoint(
-          ColourContours.getChromaObjClosestToCentre(objs).boundingBox());
+      Rectangle box = ColourContours.getChromaObjClosestToCentre(objs).boundingBox();
+      // Shrink bounding box by 25% on each side to avoid clicking outside the tile
+      int shrinkX = box.width / 4;
+      int shrinkY = box.height / 4;
+      Rectangle tight = new Rectangle(box.x + shrinkX, box.y + shrinkY,
+          box.width - shrinkX * 2, box.height - shrinkY * 2);
+      return ClickDistribution.generateRandomPoint(tight);
     } catch (Exception e) {
       logger.warn("Failed to generate point for ground item: {}", e.getMessage());
       return null;
