@@ -88,7 +88,7 @@ tasks.named("check") {
 val isWindows = org.gradle.internal.os.OperatingSystem.current().isWindows
 
 // Copy prebuilt DLLs to build/dist folder
-val copyNativeLibraries by tasks.registering(Copy::class) {
+val copyNativeLibraries by tasks.registering {
 	group = "native"
 	description = "Copy prebuilt native libraries to build/dist"
 	
@@ -97,25 +97,34 @@ val copyNativeLibraries by tasks.registering(Copy::class) {
 		isWindows
 	}
 	
-	// Check if we have prebuilt libraries
-	onlyIf {
-		val kInputExists = file("third_party/KInput/KInput/KInput/bin/Release/KInput.dll").exists()
-		val kInputCtrlExists = file("third_party/KInput/KInput/KInputCtrl/bin/Release/KInputCtrl.dll").exists()
+	doLast {
+		val destDir = file("build/dist")
+		destDir.mkdirs()
 		
-		kInputExists && kInputCtrlExists
+		val sourceDlls = listOf(
+			file("third_party/KInput/KInput/KInput/bin/Release/KInput.dll"),
+			file("third_party/KInput/KInput/KInputCtrl/bin/Release/KInputCtrl.dll")
+		)
+		
+		sourceDlls.forEach { source ->
+			if (source.exists()) {
+				val dest = file("build/dist/${source.name}")
+				try {
+					// Only copy if destination doesn't exist or is different
+					if (!dest.exists() || source.length() != dest.length()) {
+						source.copyTo(dest, overwrite = true)
+						println("Copied ${source.name} to build/dist")
+					} else {
+						println("Skipped ${source.name} (already exists)")
+					}
+				} catch (e: Exception) {
+					// If copy fails (e.g., file is locked), just warn and continue
+					println("Warning: Could not copy ${source.name}: ${e.message}")
+					println("This is OK if RuneLite is already running with the DLL loaded")
+				}
+			}
+		}
 	}
-	
-	doFirst {
-		// Ensure build/dist directory exists
-		file("build/dist").mkdirs()
-	}
-	
-	// Copy from prebuilt libraries
-	from("third_party/KInput/KInput/KInput/bin/Release")
-	from("third_party/KInput/KInput/KInputCtrl/bin/Release")
-	into("build/dist")
-	
-	include("*.dll")
 }
 
 // Note: Removed copyNativeToResources task as the application loads DLLs directly from build/dist
