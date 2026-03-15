@@ -158,7 +158,7 @@ public class ChickenKillerScript extends BaseScript {
           logger.info("Kill confirmed via XP (+{})", currentXp - previousXp);
           killsSinceLoot++;
           // Wait for death animation to finish before next action
-          waitMillis(HumanBehavior.adjustDelay(1200, 1800));
+          waitMillis(HumanBehavior.adjustDelay(600, 900));
           if (killsSinceLoot >= LOOT_EVERY_N_KILLS) {
             state = State.LOOT;
             killsSinceLoot = 0;
