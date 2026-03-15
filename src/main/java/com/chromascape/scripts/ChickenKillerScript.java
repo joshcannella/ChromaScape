@@ -2,7 +2,6 @@ package com.chromascape.scripts;
 
 import com.chromascape.api.DiscordNotification;
 import com.chromascape.base.BaseScript;
-import com.chromascape.utils.actions.Idler;
 import com.chromascape.utils.core.input.distribution.ClickDistribution;
 import com.chromascape.utils.core.screen.colour.ColourObj;
 import com.chromascape.utils.core.screen.topology.ColourContours;
@@ -169,11 +168,15 @@ public class ChickenKillerScript extends BaseScript {
   }
 
   private void waitForKill() {
-    boolean idle = Idler.waitUntilIdle(this, IDLE_TIMEOUT_SECONDS);
-    if (!idle) {
-      logger.warn("Idle timeout — chicken may have been stolen or we missed");
+    // Wait until loot appears (purple highlight) or chicken highlight disappears near us
+    LocalDateTime deadline = LocalDateTime.now().plusSeconds(IDLE_TIMEOUT_SECONDS);
+    while (LocalDateTime.now().isBefore(deadline)) {
+      // Loot appeared — chicken is dead
+      if (isColourVisible(LOOT_COLOUR)) {
+        break;
+      }
+      waitMillis(300);
     }
-    // Brief post-kill delay to simulate noticing the drop
     waitMillis(HumanBehavior.adjustDelay(400, 800));
     state = State.LOOT;
   }
@@ -347,10 +350,16 @@ public class ChickenKillerScript extends BaseScript {
     controller().mouse().leftClick();
   }
 
-  /**
-   * Finds a ground item by its RuneLite Ground Items colour highlight.
-   * Uses the same contour-safe approach as chicken detection.
-   */
+  private boolean isColourVisible(ColourObj colour) {
+    BufferedImage gameView = controller().zones().getGameView();
+    List<ChromaObj> objs = ColourContours.getChromaObjsInColour(gameView, colour);
+    boolean found = !objs.isEmpty();
+    for (ChromaObj obj : objs) {
+      obj.release();
+    }
+    return found;
+  }
+
   private Point findGroundItemByColour(ColourObj colour) {
     BufferedImage gameView = controller().zones().getGameView();
     List<ChromaObj> objs = ColourContours.getChromaObjsInColour(gameView, colour);
