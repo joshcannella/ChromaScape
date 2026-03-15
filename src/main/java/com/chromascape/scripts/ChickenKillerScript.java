@@ -14,6 +14,7 @@ import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -28,17 +29,13 @@ import org.bytedeco.opencv.opencv_core.Scalar;
  * <p><b>RuneLite Setup:</b>
  * <ul>
  *   <li>NPC Indicators — highlight "Chicken" in cyan (HSV ~90, 254-255, 254-255)</li>
+ *   <li>Ground Items — highlight "Feather" in yellow (HSV ~30, 254-255, 254-255)</li>
+ *   <li>Ground Items — highlight "Bones" in magenta (HSV ~150, 254-255, 254-255)</li>
  *   <li>Idle Notifier — enabled (required for combat idle detection)</li>
  *   <li>Windows Display Scaling: 100%</li>
  *   <li>RuneScape UI: "Fixed - Classic"</li>
  *   <li>Display Brightness: middle (50%)</li>
  *   <li>ChromaScape RuneLite Profile: activated</li>
- * </ul>
- *
- * <p><b>Image Templates (auto-downloaded from OSRS Wiki):</b>
- * <ul>
- *   <li>{@code /images/user/Feather.png}</li>
- *   <li>{@code /images/user/Bones.png}</li>
  * </ul>
  */
 public class ChickenKillerScript extends BaseScript {
@@ -46,17 +43,21 @@ public class ChickenKillerScript extends BaseScript {
   private static final Logger logger = LogManager.getLogger(ChickenKillerScript.class);
 
   // === Image Templates ===
-  private static final String FEATHER_IMAGE = "/images/user/Feather.png";
   private static final String BONES_IMAGE = "/images/user/Bones.png";
 
   // === Colour Definitions ===
-  // Chicken NPC highlight — configure RuneLite NPC Indicators to this cyan
+  // Chicken NPC highlight — configure RuneLite NPC Indicators to cyan
   private static final ColourObj CHICKEN_COLOUR =
       new ColourObj("cyan", new Scalar(90, 254, 254, 0), new Scalar(91, 255, 255, 0));
+  // Ground Items plugin — highlight "Feather" in yellow
+  private static final ColourObj FEATHER_COLOUR =
+      new ColourObj("yellow", new Scalar(30, 254, 254, 0), new Scalar(31, 255, 255, 0));
+  // Ground Items plugin — highlight "Bones" in magenta
+  private static final ColourObj BONES_COLOUR =
+      new ColourObj("magenta", new Scalar(150, 254, 254, 0), new Scalar(151, 255, 255, 0));
 
   // === Thresholds ===
   private static final double INVENTORY_THRESHOLD = 0.07;
-  private static final double GROUND_THRESHOLD = 0.15;
 
   // === Walker ===
   private static final Point COOP_CENTER = new Point(3235, 3295);
@@ -67,6 +68,7 @@ public class ChickenKillerScript extends BaseScript {
 
   // === Idle Detection Timeout ===
   private static final int IDLE_TIMEOUT_SECONDS = 12;
+  private static final int LOOT_TIMEOUT_SECONDS = 5;
 
   // === Attack Style Rotation ===
   private static final int LEVELS_PER_ROTATION_STR = 2;
@@ -182,7 +184,7 @@ public class ChickenKillerScript extends BaseScript {
   }
 
   private void lootFeathers() {
-    Point featherLoc = findImageInGameView(FEATHER_IMAGE, GROUND_THRESHOLD);
+    Point featherLoc = findGroundItemByColour(FEATHER_COLOUR);
     if (featherLoc != null) {
       clickPoint(featherLoc);
       waitMillis(HumanBehavior.adjustDelay(800, 1200));
@@ -194,16 +196,15 @@ public class ChickenKillerScript extends BaseScript {
 
   private void lootBones() {
     if (hasItem(BONES_IMAGE)) {
-      // Already have bones (maybe from a previous loot), go bury
       state = State.BURY_BONES;
       return;
     }
 
-    Point bonesLoc = findImageInGameView(BONES_IMAGE, GROUND_THRESHOLD);
+    Point bonesLoc = findGroundItemByColour(BONES_COLOUR);
     if (bonesLoc != null) {
       clickPoint(bonesLoc);
+      // Wait for pickup animation then verify
       waitMillis(HumanBehavior.adjustDelay(800, 1200));
-      // Verify pickup
       if (hasItem(BONES_IMAGE)) {
         state = State.BURY_BONES;
       } else {
@@ -368,13 +369,27 @@ public class ChickenKillerScript extends BaseScript {
     controller().mouse().leftClick();
   }
 
-  private Point findImageInGameView(String templatePath, double threshold) {
+  /**
+   * Finds a ground item by its RuneLite Ground Items colour highlight.
+   * Uses the same contour-safe approach as chicken detection.
+   */
+  private Point findGroundItemByColour(ColourObj colour) {
     BufferedImage gameView = controller().zones().getGameView();
-    var match = TemplateMatching.match(templatePath, gameView, threshold);
-    if (match.success()) {
-      return ClickDistribution.generateRandomPoint(match.bounds());
+    List<ChromaObj> objs = ColourContours.getChromaObjsInColour(gameView, colour);
+    if (objs.isEmpty()) {
+      return null;
     }
-    return null;
+    try {
+      return ClickDistribution.generateRandomPoint(
+          ColourContours.getChromaObjClosestToCentre(objs).boundingBox());
+    } catch (Exception e) {
+      logger.warn("Failed to generate point for ground item: {}", e.getMessage());
+      return null;
+    } finally {
+      for (ChromaObj obj : objs) {
+        obj.release();
+      }
+    }
   }
 
   private boolean hasItem(String templatePath) {
