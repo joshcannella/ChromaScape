@@ -47,7 +47,7 @@ public class ChickenKillerScript extends BaseScript {
   private static final ColourObj CHICKEN_COLOUR =
       new ColourObj("cyan", new Scalar(90, 254, 254, 0), new Scalar(91, 255, 255, 0));
   private static final ColourObj LOOT_COLOUR =
-      new ColourObj("purple", new Scalar(150, 254, 254, 0), new Scalar(151, 255, 255, 0));
+      new ColourObj("purple", new Scalar(140, 200, 200, 0), new Scalar(160, 255, 255, 0));
 
   // === Thresholds ===
   private static final double INVENTORY_THRESHOLD = 0.07;
@@ -114,8 +114,10 @@ public class ChickenKillerScript extends BaseScript {
    */
   private void fight() {
     // Snapshot XP before attacking
-    int previousXp = Minimap.getXp(this);
-    if (previousXp == -1) {
+    int previousXp;
+    try {
+      previousXp = Minimap.getXp(this);
+    } catch (Exception e) {
       logger.warn("Could not read XP, retrying next cycle");
       return;
     }
@@ -193,7 +195,15 @@ public class ChickenKillerScript extends BaseScript {
 
   private void waitUntilXpChange(int previousXp) {
     LocalDateTime deadline = LocalDateTime.now().plusSeconds(XP_TIMEOUT_SECONDS);
-    while (previousXp == Minimap.getXp(this) && LocalDateTime.now().isBefore(deadline)) {
+    while (LocalDateTime.now().isBefore(deadline)) {
+      try {
+        int currentXp = Minimap.getXp(this);
+        if (currentXp != previousXp) {
+          return;
+        }
+      } catch (Exception e) {
+        // OCR may fail intermittently — just retry
+      }
       waitMillis(300);
     }
   }
