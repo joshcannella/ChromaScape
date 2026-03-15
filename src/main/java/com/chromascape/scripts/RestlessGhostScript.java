@@ -44,7 +44,6 @@ public class RestlessGhostScript extends BaseScript {
     TALK_URHNEY,
     EQUIP_AMULET,
     OPEN_COFFIN,
-    TALK_GHOST,
     WALK_TO_TOWER,
     DESCEND_TOWER,
     GET_SKULL,
@@ -55,6 +54,8 @@ public class RestlessGhostScript extends BaseScript {
   }
 
   private Step step = Step.ENTER_CHURCH;
+  private int urhneyAttempts = 0;
+  private boolean walkedToAltar = false;
 
   @Override
   protected void cycle() {
@@ -111,6 +112,14 @@ public class RestlessGhostScript extends BaseScript {
       }
       case TALK_URHNEY -> {
         if (!hasItem(AMULET_IMAGE)) {
+          urhneyAttempts++;
+          if (urhneyAttempts > 3) {
+            // Aereck dialog likely failed — restart from church
+            logger.warn("Urhney not giving amulet after {} attempts, restarting from church.", urhneyAttempts);
+            urhneyAttempts = 0;
+            step = Step.ENTER_CHURCH;
+            return;
+          }
           // Click to open door (or talk if already open)
           clickGameCenter();
           waitMillis(HumanBehavior.adjustDelay(1500, 2500));
@@ -126,9 +135,9 @@ public class RestlessGhostScript extends BaseScript {
             pressSpace();
             waitMillis(HumanBehavior.adjustDelay(800, 1200));
           }
-          // Do NOT advance here — let the next cycle's hasItem check confirm we got the amulet.
-          // If dialog failed, the cycle retries the click+dialog naturally.
+          // Do NOT advance — let the next cycle's hasItem check confirm we got the amulet.
         } else {
+          urhneyAttempts = 0;
           step = Step.EQUIP_AMULET;
         }
       }
@@ -143,11 +152,10 @@ public class RestlessGhostScript extends BaseScript {
       }
       case OPEN_COFFIN -> {
         walkTo(COFFIN_TILE, "coffin");
+        // Open the coffin
         clickGameCenter();
         waitMillis(HumanBehavior.adjustDelay(2500, 3500));
-        step = Step.TALK_GHOST;
-      }
-      case TALK_GHOST -> {
+        // Talk to the ghost that appears
         clickGameCenter();
         waitMillis(HumanBehavior.adjustDelay(1500, 2500));
         for (int i = 0; i < 8; i++) {
@@ -164,24 +172,38 @@ public class RestlessGhostScript extends BaseScript {
       case DESCEND_TOWER -> {
         clickGameCenter();
         waitMillis(HumanBehavior.adjustDelay(2500, 3500));
-        step = Step.GET_SKULL;
+        // Verify we actually descended by checking if walker can reach the basement altar
+        if (canWalkTo(ALTAR_TILE)) {
+          step = Step.GET_SKULL;
+        } else {
+          logger.warn("Ladder descent may have failed, retrying...");
+        }
       }
       case GET_SKULL -> {
         if (!hasItem(SKULL_IMAGE)) {
-          walkTo(ALTAR_TILE, "altar");
+          if (!walkedToAltar) {
+            walkTo(ALTAR_TILE, "altar");
+            walkedToAltar = true;
+          }
           clickGameCenter();
           waitMillis(HumanBehavior.adjustDelay(1500, 2500));
           pressSpace();
           waitMillis(HumanBehavior.adjustDelay(800, 1200));
           // Don't advance — let next cycle's hasItem check confirm skull pickup
         } else {
+          walkedToAltar = false;
           step = Step.ASCEND_TOWER;
         }
       }
       case ASCEND_TOWER -> {
         clickGameCenter();
         waitMillis(HumanBehavior.adjustDelay(2500, 3500));
-        step = Step.RETURN_TO_COFFIN;
+        // Verify we actually ascended by checking if walker can reach the coffin
+        if (canWalkTo(COFFIN_TILE)) {
+          step = Step.RETURN_TO_COFFIN;
+        } else {
+          logger.warn("Ladder ascent may have failed, retrying...");
+        }
       }
       case RETURN_TO_COFFIN -> {
         walkTo(COFFIN_TILE, "coffin");
@@ -285,6 +307,15 @@ public class RestlessGhostScript extends BaseScript {
     } catch (InterruptedException e) {
       logger.error("Walker interrupted going to {}", label);
       stop();
+    }
+  }
+
+  private boolean canWalkTo(Point destination) {
+    try {
+      controller().walker().pathTo(destination, false);
+      return true;
+    } catch (IOException | InterruptedException e) {
+      return false;
     }
   }
 
