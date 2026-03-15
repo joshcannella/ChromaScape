@@ -2,10 +2,12 @@ package com.chromascape.scripts;
 
 import com.chromascape.api.DiscordNotification;
 import com.chromascape.base.BaseScript;
+import com.chromascape.utils.actions.Minimap;
+import com.chromascape.utils.actions.MovingObject;
 import com.chromascape.utils.core.input.distribution.ClickDistribution;
 import com.chromascape.utils.core.screen.colour.ColourObj;
-import com.chromascape.utils.core.screen.topology.ColourContours;
 import com.chromascape.utils.core.screen.topology.ChromaObj;
+import com.chromascape.utils.core.screen.topology.ColourContours;
 import com.chromascape.utils.core.screen.topology.TemplateMatching;
 import com.chromascape.utils.core.screen.window.ScreenManager;
 import com.chromascape.scripts.HumanBehavior;
@@ -23,13 +25,11 @@ import org.bytedeco.opencv.opencv_core.Scalar;
  * Kills chickens at the Lumbridge chicken coop, loots feathers and bones, and buries bones for
  * Prayer XP. Rotates attack styles (Strength → Attack → Defence) based on levels gained.
  *
- * <p><b>Prerequisites:</b> None (F2P, level 1 account works).
- *
  * <p><b>RuneLite Setup:</b>
  * <ul>
  *   <li>NPC Indicators — highlight "Chicken" in cyan (HSV ~90, 254-255, 254-255)</li>
  *   <li>Ground Items — highlight "Feather" and "Bones" in purple (HSV ~150, 254-255, 254-255)</li>
- *   <li>Idle Notifier — enabled (required for combat idle detection)</li>
+ *   <li>XP bar set to permanent (required for XP-based kill detection)</li>
  *   <li>Windows Display Scaling: 100%</li>
  *   <li>RuneScape UI: "Fixed - Classic"</li>
  *   <li>Display Brightness: middle (50%)</li>
@@ -40,14 +40,12 @@ public class ChickenKillerScript extends BaseScript {
 
   private static final Logger logger = LogManager.getLogger(ChickenKillerScript.class);
 
-  // === Image Templates ===
+  // === Image Templates (inventory only) ===
   private static final String BONES_IMAGE = "/images/user/Bones.png";
 
   // === Colour Definitions ===
-  // Chicken NPC highlight — configure RuneLite NPC Indicators to cyan
   private static final ColourObj CHICKEN_COLOUR =
       new ColourObj("cyan", new Scalar(90, 254, 254, 0), new Scalar(91, 255, 255, 0));
-  // Ground Items plugin — highlight "Feather" and "Bones" in purple
   private static final ColourObj LOOT_COLOUR =
       new ColourObj("purple", new Scalar(150, 254, 254, 0), new Scalar(151, 255, 255, 0));
 
@@ -57,13 +55,11 @@ public class ChickenKillerScript extends BaseScript {
   // === Walker ===
   private static final Point COOP_CENTER = new Point(3235, 3295);
 
-  // === Combat Failure Logout ===
+  // === Timeouts ===
+  private static final int XP_TIMEOUT_SECONDS = 15;
+  private static final int LOOT_APPEAR_TIMEOUT_SECONDS = 3;
   private static final int MAX_COMBAT_FAILURES = 10;
   private int combatFailures = 0;
-
-  // === Idle Detection Timeout ===
-  private static final int IDLE_TIMEOUT_SECONDS = 12;
-  private static final int LOOT_TIMEOUT_SECONDS = 5;
 
   // === Attack Style Rotation ===
   private static final int LEVELS_PER_ROTATION_STR = 2;
@@ -71,15 +67,12 @@ public class ChickenKillerScript extends BaseScript {
   private static final int LEVELS_PER_ROTATION_DEF = 1;
 
   private enum AttackStyle { STRENGTH, ATTACK, DEFENCE }
-
   private AttackStyle currentStyle = AttackStyle.STRENGTH;
   private int levelsGainedThisRotation = 0;
-  private int lastTrackedLevel = -1;
 
   // === State Machine ===
-  private enum State { FIND_CHICKEN, WAIT_FOR_KILL, LOOT, BURY_BONES }
-
-  private State state = State.FIND_CHICKEN;
+  private enum State { FIGHT, LOOT, BURY_BONES }
+  private State state = State.FIGHT;
 
   @Override
   protected void cycle() {
@@ -99,10 +92,9 @@ public class ChickenKillerScript extends BaseScript {
       HumanBehavior.performIdleDrift(this);
     }
 
-    // Dismiss level-up dialogue
     dismissLevelUp();
 
-    // Check if bones are in inventory (from a previous incomplete cycle)
+    // If we have bones from a previous cycle, bury first
     if (hasItem(BONES_IMAGE)) {
       state = State.BURY_BONES;
     }
@@ -110,34 +102,26 @@ public class ChickenKillerScript extends BaseScript {
     logger.info("State: {}", state);
 
     switch (state) {
-      case FIND_CHICKEN -> findChicken();
-      case WAIT_FOR_KILL -> waitForKill();
+      case FIGHT -> fight();
       case LOOT -> loot();
       case BURY_BONES -> buryBones();
     }
   }
 
-  private void findChicken() {
-    BufferedImage gameView = controller().zones().getGameView();
-
-    // Pre-check: verify contours exist and are valid before calling PointSelector
-    // PointSelector can crash with OpenCV assertion if contour Mat is empty/invalid
-    List<ChromaObj> objs = ColourContours.getChromaObjsInColour(gameView, CHICKEN_COLOUR);
-    Point chickenLoc = null;
-    if (!objs.isEmpty()) {
-      try {
-        chickenLoc = ClickDistribution.generateRandomPoint(
-            ColourContours.getChromaObjClosestToCentre(objs).boundingBox());
-      } catch (Exception e) {
-        logger.warn("Failed to generate click point from contour: {}", e.getMessage());
-      } finally {
-        for (ChromaObj obj : objs) {
-          obj.release();
-        }
-      }
+  /**
+   * Attacks a chicken using MovingObject (red-click verified), then waits for XP change
+   * to confirm the kill. This is the same proven pattern used by the agility script.
+   */
+  private void fight() {
+    // Snapshot XP before attacking
+    int previousXp = Minimap.getXp(this);
+    if (previousXp == -1) {
+      logger.warn("Could not read XP, retrying next cycle");
+      return;
     }
 
-    if (chickenLoc == null) {
+    // Check if a chicken is visible
+    if (!isColourVisible(CHICKEN_COLOUR)) {
       logger.warn("No chicken found, failure {}/{}", combatFailures + 1, MAX_COMBAT_FAILURES);
       combatFailures++;
       if (combatFailures >= MAX_COMBAT_FAILURES) {
@@ -150,205 +134,73 @@ public class ChickenKillerScript extends BaseScript {
       return;
     }
 
-    String speed = HumanBehavior.shouldSlowApproach() ? "slow" : "medium";
-    controller().mouse().moveTo(chickenLoc, speed);
-    if (HumanBehavior.shouldHesitate()) {
-      HumanBehavior.performHesitation();
+    // Click the chicken — MovingObject handles retries and red-click verification
+    if (!MovingObject.clickMovingObjectByColourObjUntilRedClick(CHICKEN_COLOUR, this)) {
+      logger.warn("Failed to red-click chicken");
+      combatFailures++;
+      return;
     }
-    if (HumanBehavior.shouldMisclick()) {
-      HumanBehavior.performMisclick(this, chickenLoc);
-      controller().mouse().moveTo(chickenLoc, "medium");
-    }
-    controller().mouse().microJitter();
-    controller().mouse().leftClick();
 
     combatFailures = 0;
-    state = State.WAIT_FOR_KILL;
-    logger.info("Attacked chicken");
-  }
+    logger.info("Attacked chicken, waiting for kill...");
 
-  private void waitForKill() {
-    // Wait until loot appears (purple highlight) or chicken highlight disappears near us
-    LocalDateTime deadline = LocalDateTime.now().plusSeconds(IDLE_TIMEOUT_SECONDS);
-    while (LocalDateTime.now().isBefore(deadline)) {
-      // Loot appeared — chicken is dead
-      if (isColourVisible(LOOT_COLOUR)) {
-        break;
-      }
-      waitMillis(300);
-    }
-    waitMillis(HumanBehavior.adjustDelay(400, 800));
+    // Wait for XP to change = kill confirmed
+    waitUntilXpChange(previousXp);
+
+    // Brief delay for loot to render on ground
+    waitMillis(HumanBehavior.adjustDelay(600, 1000));
     state = State.LOOT;
   }
 
   private void loot() {
-    // Click all purple-highlighted ground items (feathers + bones)
+    // Wait briefly for loot highlight to appear if not visible yet
+    if (!isColourVisible(LOOT_COLOUR)) {
+      LocalDateTime deadline = LocalDateTime.now().plusSeconds(LOOT_APPEAR_TIMEOUT_SECONDS);
+      while (!isColourVisible(LOOT_COLOUR) && LocalDateTime.now().isBefore(deadline)) {
+        waitMillis(300);
+      }
+    }
+
     Point lootLoc = findGroundItemByColour(LOOT_COLOUR);
     if (lootLoc != null) {
-      clickPoint(lootLoc);
+      controller().mouse().moveTo(lootLoc, "medium");
+      controller().mouse().leftClick();
       waitMillis(HumanBehavior.adjustDelay(800, 1200));
-      // Stay in LOOT state to pick up remaining items next cycle
+      // Stay in LOOT to pick up remaining items
       return;
     }
-    // Nothing left on ground — bury bones if we have any
+
+    // Nothing left — check for bones to bury
     if (hasItem(BONES_IMAGE)) {
       state = State.BURY_BONES;
     } else {
       checkStyleRotation();
-      state = State.FIND_CHICKEN;
+      state = State.FIGHT;
     }
   }
 
   private void buryBones() {
     if (!hasItem(BONES_IMAGE)) {
       checkStyleRotation();
-      state = State.FIND_CHICKEN;
+      state = State.FIGHT;
       return;
     }
-
     clickInventoryItem(BONES_IMAGE);
-    // Bury animation is 2 ticks (~1.2s)
     waitMillis(HumanBehavior.adjustDelay(1200, 1600));
     checkStyleRotation();
-    state = State.FIND_CHICKEN;
+    state = State.FIGHT;
   }
 
-  // === Attack Style Rotation ===
+  // === XP Tracking ===
 
-  /**
-   * Checks if enough levels have been gained on the current style to rotate. Reads the relevant
-   * skill level from the stats tab via OCR would be ideal, but since we don't have direct stat
-   * reading, we track via XP drops / level-up dialogues. For simplicity, we count level-up
-   * dialogue dismissals as level gains.
-   */
-  private void checkStyleRotation() {
-    // This is called after each kill cycle. Level-up detection is handled by dismissLevelUp()
-    // which increments levelsGainedThisRotation when it detects a level-up.
-    int required = getRequiredLevels(currentStyle);
-    if (levelsGainedThisRotation >= required) {
-      rotateStyle();
+  private void waitUntilXpChange(int previousXp) {
+    LocalDateTime deadline = LocalDateTime.now().plusSeconds(XP_TIMEOUT_SECONDS);
+    while (previousXp == Minimap.getXp(this) && LocalDateTime.now().isBefore(deadline)) {
+      waitMillis(300);
     }
   }
 
-  private int getRequiredLevels(AttackStyle style) {
-    return switch (style) {
-      case STRENGTH -> LEVELS_PER_ROTATION_STR;
-      case ATTACK -> LEVELS_PER_ROTATION_ATT;
-      case DEFENCE -> LEVELS_PER_ROTATION_DEF;
-    };
-  }
-
-  private void rotateStyle() {
-    AttackStyle previous = currentStyle;
-    currentStyle = switch (currentStyle) {
-      case STRENGTH -> AttackStyle.ATTACK;
-      case ATTACK -> AttackStyle.DEFENCE;
-      case DEFENCE -> AttackStyle.STRENGTH;
-    };
-    levelsGainedThisRotation = 0;
-    logger.info("Rotating attack style: {} → {}", previous, currentStyle);
-    switchAttackStyle(currentStyle);
-  }
-
-  /**
-   * Opens the combat tab, clicks the correct attack style, then returns to inventory tab.
-   * Style positions: 1st=Accurate(Att), 2nd=Aggressive(Str), 3rd=Controlled, 4th=Defensive(Def).
-   * The combat options panel has 4 style boxes arranged in a 2x2 grid within the inventory panel
-   * area.
-   */
-  private void switchAttackStyle(AttackStyle style) {
-    // Click combat tab
-    Rectangle combatTab = controller().zones().getCtrlPanel().get("combatTab");
-    Point tabLoc = ClickDistribution.generateRandomPoint(combatTab);
-    controller().mouse().moveTo(tabLoc, "medium");
-    controller().mouse().leftClick();
-    waitMillis(HumanBehavior.adjustDelay(400, 600));
-
-    // Click the style button within the combat options panel
-    // The panel area is the inventoryPanel zone. Styles are in a 2x2 grid:
-    // Top-left: Accurate (Attack), Top-right: Aggressive (Strength)
-    // Bottom-left: Controlled (skip), Bottom-right: Defensive (Defence)
-    Rectangle panel = controller().zones().getCtrlPanel().get("inventoryPanel");
-    Rectangle styleBox;
-    switch (style) {
-      case ATTACK -> // Accurate: top-left
-          styleBox = new Rectangle(panel.x, panel.y + 10, panel.width / 2 - 5, 45);
-      case STRENGTH -> // Aggressive: top-right
-          styleBox = new Rectangle(panel.x + panel.width / 2 + 5, panel.y + 10,
-              panel.width / 2 - 5, 45);
-      case DEFENCE -> // Defensive: bottom-right
-          styleBox = new Rectangle(panel.x + panel.width / 2 + 5, panel.y + 65,
-              panel.width / 2 - 5, 45);
-      default -> {
-        return;
-      }
-    }
-
-    Point styleLoc = ClickDistribution.generateRandomPoint(styleBox);
-    controller().mouse().moveTo(styleLoc, "medium");
-    controller().mouse().leftClick();
-    waitMillis(HumanBehavior.adjustDelay(300, 500));
-
-    // Return to inventory tab
-    Rectangle invTab = controller().zones().getCtrlPanel().get("inventoryTab");
-    Point invLoc = ClickDistribution.generateRandomPoint(invTab);
-    controller().mouse().moveTo(invLoc, "medium");
-    controller().mouse().leftClick();
-    waitMillis(HumanBehavior.adjustDelay(200, 400));
-
-    logger.info("Switched to {} style", style);
-  }
-
-  // === Level-Up Detection ===
-
-  /**
-   * Presses space to dismiss any level-up dialogue. If a level-up was present, increments the
-   * rotation counter.
-   */
-  private void dismissLevelUp() {
-    // Check chatbox for level-up text
-    Rectangle chatZone = controller().zones().getChatTabs().get("Chat");
-    if (chatZone == null) {
-      return;
-    }
-    BufferedImage chatImg = ScreenManager.captureZone(chatZone);
-    // Level-up dialogues show a "Continue" prompt — check for it by looking for the
-    // dialogue overlay. We press space speculatively; if no dialogue, it's harmless.
-    // A more robust approach: check if the game view has a dialogue overlay.
-    // For now, we detect via the "Click here to continue" pattern in chat.
-    // Simple approach: press space once. If there was a level-up, it dismisses it.
-    // We detect level-ups by checking if the continue button area has content.
-    // Actually, the simplest reliable approach: just press space. If nothing happens, no harm.
-    pressSpace();
-    waitMillis(HumanBehavior.adjustDelay(100, 200));
-  }
-
-  /**
-   * Called externally or via chat detection when a level-up is confirmed. For now, we increment
-   * on every kill cycle and rely on the rotation threshold being high enough. A more precise
-   * approach would use OCR on the stats tab.
-   */
-  public void onLevelUp() {
-    levelsGainedThisRotation++;
-    logger.info("Level gained! ({}/{} for {} rotation)", levelsGainedThisRotation,
-        getRequiredLevels(currentStyle), currentStyle);
-  }
-
-  // === Utility Methods ===
-
-  private void clickPoint(Point loc) {
-    String speed = HumanBehavior.shouldSlowApproach() ? "slow" : "medium";
-    controller().mouse().moveTo(loc, speed);
-    if (HumanBehavior.shouldHesitate()) {
-      HumanBehavior.performHesitation();
-    }
-    if (HumanBehavior.shouldMisclick()) {
-      HumanBehavior.performMisclick(this, loc);
-      controller().mouse().moveTo(loc, "medium");
-    }
-    controller().mouse().microJitter();
-    controller().mouse().leftClick();
-  }
+  // === Colour Utilities ===
 
   private boolean isColourVisible(ColourObj colour) {
     BufferedImage gameView = controller().zones().getGameView();
@@ -379,6 +231,8 @@ public class ChickenKillerScript extends BaseScript {
     }
   }
 
+  // === Inventory Utilities ===
+
   private boolean hasItem(String templatePath) {
     for (int i = 0; i < 28; i++) {
       Rectangle slot = controller().zones().getInventorySlots().get(i);
@@ -404,6 +258,8 @@ public class ChickenKillerScript extends BaseScript {
     logger.warn("Item not found in inventory: {}", templatePath);
   }
 
+  // === Recovery ===
+
   private void recoverToCoop() {
     try {
       logger.info("Walking back to chicken coop");
@@ -417,9 +273,74 @@ public class ChickenKillerScript extends BaseScript {
     }
   }
 
-  private void pressSpace() {
+  // === Attack Style Rotation ===
+
+  private void checkStyleRotation() {
+    int required = getRequiredLevels(currentStyle);
+    if (levelsGainedThisRotation >= required) {
+      rotateStyle();
+    }
+  }
+
+  private int getRequiredLevels(AttackStyle style) {
+    return switch (style) {
+      case STRENGTH -> LEVELS_PER_ROTATION_STR;
+      case ATTACK -> LEVELS_PER_ROTATION_ATT;
+      case DEFENCE -> LEVELS_PER_ROTATION_DEF;
+    };
+  }
+
+  private void rotateStyle() {
+    AttackStyle previous = currentStyle;
+    currentStyle = switch (currentStyle) {
+      case STRENGTH -> AttackStyle.ATTACK;
+      case ATTACK -> AttackStyle.DEFENCE;
+      case DEFENCE -> AttackStyle.STRENGTH;
+    };
+    levelsGainedThisRotation = 0;
+    logger.info("Rotating attack style: {} → {}", previous, currentStyle);
+    switchAttackStyle(currentStyle);
+  }
+
+  private void switchAttackStyle(AttackStyle style) {
+    Rectangle combatTab = controller().zones().getCtrlPanel().get("combatTab");
+    controller().mouse().moveTo(ClickDistribution.generateRandomPoint(combatTab), "medium");
+    controller().mouse().leftClick();
+    waitMillis(HumanBehavior.adjustDelay(400, 600));
+
+    Rectangle panel = controller().zones().getCtrlPanel().get("inventoryPanel");
+    Rectangle styleBox = switch (style) {
+      case ATTACK -> new Rectangle(panel.x, panel.y + 10, panel.width / 2 - 5, 45);
+      case STRENGTH -> new Rectangle(panel.x + panel.width / 2 + 5, panel.y + 10,
+          panel.width / 2 - 5, 45);
+      case DEFENCE -> new Rectangle(panel.x + panel.width / 2 + 5, panel.y + 65,
+          panel.width / 2 - 5, 45);
+    };
+
+    controller().mouse().moveTo(ClickDistribution.generateRandomPoint(styleBox), "medium");
+    controller().mouse().leftClick();
+    waitMillis(HumanBehavior.adjustDelay(300, 500));
+
+    Rectangle invTab = controller().zones().getCtrlPanel().get("inventoryTab");
+    controller().mouse().moveTo(ClickDistribution.generateRandomPoint(invTab), "medium");
+    controller().mouse().leftClick();
+    waitMillis(HumanBehavior.adjustDelay(200, 400));
+
+    logger.info("Switched to {} style", style);
+  }
+
+  // === Level-Up Detection ===
+
+  private void dismissLevelUp() {
     controller().keyboard().sendModifierKey(401, "space");
     waitMillis(HumanBehavior.adjustDelay(80, 120));
     controller().keyboard().sendModifierKey(402, "space");
+    waitMillis(HumanBehavior.adjustDelay(100, 200));
+  }
+
+  public void onLevelUp() {
+    levelsGainedThisRotation++;
+    logger.info("Level gained! ({}/{} for {} rotation)", levelsGainedThisRotation,
+        getRequiredLevels(currentStyle), currentStyle);
   }
 }
