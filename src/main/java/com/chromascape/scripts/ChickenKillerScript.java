@@ -135,7 +135,8 @@ public class ChickenKillerScript extends BaseScript {
     try {
       previousXp = Minimap.getXp(this);
     } catch (Exception e) {
-      // If OCR fails, we'll fall back to timeout
+      logger.warn("Could not read XP, retrying next cycle");
+      return;
     }
     if (!MovingObject.clickMovingObjectByColourObjUntilRedClick(CHICKEN_COLOUR, this)) {
       logger.warn("Failed to red-click chicken");
