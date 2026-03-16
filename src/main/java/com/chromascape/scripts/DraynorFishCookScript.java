@@ -81,9 +81,12 @@ public class DraynorFishCookScript extends BaseScript {
   private static final Point FISHING_TILE = new Point(3087, 3228);
   private static final Point TREE_TILE = new Point(3080, 3230);
 
+  // === Configuration ===
+  private static final boolean COOKING_ENABLED = true; // set false to fish-and-drop only
+
   // === Constants ===
   private static final double INV_THRESHOLD = 0.07;
-  private static final int TARGET_RAW = 26; // 28 - tinderbox - net
+  private static final int TARGET_RAW = COOKING_ENABLED ? 26 : 27; // reserve slots for tools
   private static final int FIRE_TIMEOUT_SECONDS = 10;
   private static final int MAX_STUCK_CYCLES = 10;
 
@@ -118,7 +121,7 @@ public class DraynorFishCookScript extends BaseScript {
     }
 
     // Prerequisites
-    if (!hasItem(TINDERBOX)) {
+    if (COOKING_ENABLED && !hasItem(TINDERBOX)) {
       logger.error("No tinderbox in inventory.");
       DiscordNotification.send("DraynorFishCook: No tinderbox. Stopping.");
       stop();
@@ -139,12 +142,14 @@ public class DraynorFishCookScript extends BaseScript {
     // Determine state
     if (rawCount == 0 && hasCooked) {
       state = State.DROP;
-    } else if (rawCount >= TARGET_RAW && !hasLogs) {
+    } else if (COOKING_ENABLED && rawCount >= TARGET_RAW && !hasLogs) {
       state = State.CHOP;
-    } else if (rawCount >= TARGET_RAW && hasLogs && !isColourVisible(FIRE_COLOUR)) {
+    } else if (COOKING_ENABLED && rawCount >= TARGET_RAW && hasLogs && !isColourVisible(FIRE_COLOUR)) {
       state = State.LIGHT_FIRE;
-    } else if (rawCount >= TARGET_RAW && isColourVisible(FIRE_COLOUR)) {
+    } else if (COOKING_ENABLED && rawCount >= TARGET_RAW && isColourVisible(FIRE_COLOUR)) {
       state = State.COOK;
+    } else if (!COOKING_ENABLED && rawCount >= TARGET_RAW) {
+      state = State.DROP;
     } else {
       state = State.FISH;
     }
