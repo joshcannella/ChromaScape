@@ -5,6 +5,7 @@ import com.chromascape.base.BaseScript;
 import com.chromascape.utils.actions.Inventory;
 import com.chromascape.utils.actions.KeyPress;
 import com.chromascape.utils.actions.MouseOver;
+import com.chromascape.utils.actions.Walk;
 import com.chromascape.utils.core.input.distribution.ClickDistribution;
 import com.chromascape.utils.core.screen.topology.TemplateMatching;
 import com.chromascape.utils.core.screen.window.ScreenManager;
@@ -12,7 +13,6 @@ import com.chromascape.utils.actions.HumanBehavior;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
-import java.io.IOException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -114,7 +114,7 @@ public class CooksAssistantScript extends BaseScript {
         switch (step) {
             case GET_POT -> {
                 if (!Inventory.hasItem(this, POT_IMAGE, MATCH_THRESHOLD)) {
-                    walkTo(POT_TILE, "pot");
+                    Walk.toOrStop(this, POT_TILE, "pot");
                     Point potLoc = findImageInGameView(POT_IMAGE);
                     if (potLoc != null) {
                         controller().mouse().moveTo(potLoc, "medium");
@@ -130,14 +130,14 @@ public class CooksAssistantScript extends BaseScript {
             }
             case GO_TO_CELLAR -> {
                 // Click trapdoor to enter cellar
-                walkTo(TRAPDOOR_TILE, "trapdoor");
+                Walk.toOrStop(this, TRAPDOOR_TILE, "trapdoor");
                 clickGameCenter();
                 waitMillis(HumanBehavior.adjustDelay(2500, 3500));
                 step = Step.GET_BUCKET;
             }
             case GET_BUCKET -> {
                 if (!Inventory.hasItem(this, BUCKET_IMAGE, MATCH_THRESHOLD)) {
-                    walkTo(BUCKET_TILE, "bucket");
+                    Walk.toOrStop(this, BUCKET_TILE, "bucket");
                     Point bucketLoc = findImageInGameView(BUCKET_IMAGE);
                     if (bucketLoc != null) {
                         controller().mouse().moveTo(bucketLoc, "medium");
@@ -153,14 +153,14 @@ public class CooksAssistantScript extends BaseScript {
             }
             case LEAVE_CELLAR -> {
                 // Climb ladder up from cellar
-                walkTo(CELLAR_LADDER_TILE, "ladder");
+                Walk.toOrStop(this, CELLAR_LADDER_TILE, "ladder");
                 clickGameCenter();
                 waitMillis(HumanBehavior.adjustDelay(2500, 3500));
                 step = Step.GET_EGG;
             }
             case GET_EGG -> {
                 if (!Inventory.hasItem(this, EGG_IMAGE, MATCH_THRESHOLD)) {
-                    walkTo(EGG_TILE, "egg");
+                    Walk.toOrStop(this, EGG_TILE, "egg");
                     // Try template matching first with relaxed threshold
                     Point eggLoc = findImageInGameView(EGG_IMAGE, 0.15);
                     if (eggLoc == null) {
@@ -178,7 +178,7 @@ public class CooksAssistantScript extends BaseScript {
             }
             case GET_MILK -> {
                 if (!Inventory.hasItem(this, MILK_IMAGE, MATCH_THRESHOLD)) {
-                    walkTo(DAIRY_COW_TILE, "dairy cow");
+                    Walk.toOrStop(this, DAIRY_COW_TILE, "dairy cow");
                     Inventory.clickItem(this, BUCKET_IMAGE, MATCH_THRESHOLD, "medium");
                     waitMillis(HumanBehavior.adjustDelay(300, 500));
                     clickGameCenter();
@@ -189,7 +189,7 @@ public class CooksAssistantScript extends BaseScript {
             }
             case GET_GRAIN -> {
                 if (!Inventory.hasItem(this, GRAIN_IMAGE, MATCH_THRESHOLD)) {
-                    walkTo(WHEAT_TILE, "wheat");
+                    Walk.toOrStop(this, WHEAT_TILE, "wheat");
                     clickGameCenter(); // Wheat is tall and visible at center
                     waitMillis(HumanBehavior.adjustDelay(1200, 1800));
                 } else {
@@ -197,7 +197,7 @@ public class CooksAssistantScript extends BaseScript {
                 }
             }
             case MILL_CLIMB_UP -> {
-                walkTo(MILL_GROUND_TILE, "mill");
+                Walk.toOrStop(this, MILL_GROUND_TILE, "mill");
                 // Climb two flights of stairs
                 clickGameCenter();
                 waitMillis(HumanBehavior.adjustDelay(2000, 3000));
@@ -239,7 +239,7 @@ public class CooksAssistantScript extends BaseScript {
                 }
             }
             case DELIVER -> {
-                walkTo(COOK_TILE, "cook");
+                Walk.toOrStop(this, COOK_TILE, "cook");
                 clickGameCenter();
                 waitMillis(HumanBehavior.adjustDelay(1500, 2500));
                 // Dialogue: "What's wrong?" → 1, "Can I help?" → 1
@@ -336,18 +336,5 @@ public class CooksAssistantScript extends BaseScript {
             return ClickDistribution.generateRandomPoint(match.bounds());
         }
         return null;
-    }
-
-    private void walkTo(Point destination, String label) {
-        try {
-            controller().walker().pathTo(destination, false);
-            waitRandomMillis(4000, 6000);
-        } catch (IOException e) {
-            logger.error("Walker error going to {}: {}", label, e.getMessage());
-            stop();
-        } catch (InterruptedException e) {
-            logger.error("Walker interrupted going to {}", label);
-            stop();
-        }
     }
 }

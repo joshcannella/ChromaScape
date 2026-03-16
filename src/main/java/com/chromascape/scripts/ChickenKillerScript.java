@@ -2,6 +2,7 @@ package com.chromascape.scripts;
 
 import com.chromascape.api.DiscordNotification;
 import com.chromascape.base.BaseScript;
+import com.chromascape.utils.actions.ColourClick;
 import com.chromascape.utils.actions.Minimap;
 import com.chromascape.utils.actions.MovingObject;
 import com.chromascape.utils.core.input.distribution.ClickDistribution;
@@ -78,7 +79,7 @@ public class ChickenKillerScript extends BaseScript {
   private static final int ENGAGE_TIMEOUT_MS = 2000;
 
   private void fight() {
-    if (!isColourVisible(CHICKEN_COLOUR)) {
+    if (!ColourClick.isVisible(this, CHICKEN_COLOUR)) {
       logger.warn("No chicken found, failure {}/{}", combatFailures + 1, MAX_COMBAT_FAILURES);
       combatFailures++;
       if (combatFailures >= MAX_COMBAT_FAILURES) {
@@ -179,16 +180,6 @@ public class ChickenKillerScript extends BaseScript {
         obj.release();
       }
     }
-  }
-
-  private boolean isColourVisible(ColourObj colour) {
-    BufferedImage gameView = controller().zones().getGameView();
-    List<ChromaObj> objs = ColourContours.getChromaObjsInColour(gameView, colour);
-    boolean found = !objs.isEmpty();
-    for (ChromaObj obj : objs) {
-      obj.release();
-    }
-    return found;
   }
 
   // === Recovery ===

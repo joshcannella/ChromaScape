@@ -1,16 +1,16 @@
 package com.chromascape.scripts;
 
 import com.chromascape.base.BaseScript;
+import com.chromascape.utils.actions.Bank;
 import com.chromascape.utils.actions.Idler;
 import com.chromascape.utils.actions.PointSelector;
-import com.chromascape.utils.core.input.distribution.ClickDistribution;
+import com.chromascape.utils.actions.Walk;
 import com.chromascape.utils.core.screen.topology.TemplateMatching;
 import com.chromascape.utils.core.screen.window.ScreenManager;
 import com.chromascape.utils.actions.HumanBehavior;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
-import java.io.IOException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -75,62 +75,13 @@ public class AlKharidIronMiningScript extends BaseScript {
      * then walks back to the mine.
      */
     private void bankOre() {
-        walkTo(BANK_TILE, "bank");
+        Walk.toOrStop(this, BANK_TILE, "bank");
         waitMillis(HumanBehavior.adjustDelay(600, 900));
-
-        // Click bank booth
-        BufferedImage gameView = controller().zones().getGameView();
-        Point bankLoc = PointSelector.getRandomPointInColour(gameView, BANK_COLOUR, 15);
-        if (bankLoc == null) {
-            logger.error("Bank booth not found");
-            stop();
-            return;
-        }
-        String speed = HumanBehavior.shouldSlowApproach() ? "slow" : "medium";
-        controller().mouse().moveTo(bankLoc, speed);
-        controller().mouse().microJitter();
-        controller().mouse().leftClick();
-        waitMillis(HumanBehavior.adjustDelay(1200, 1800));
-
-        // Click deposit-all via right-click menu
-        Rectangle firstSlot = controller().zones().getInventorySlots().get(0);
-        Point slotLoc = ClickDistribution.generateRandomPoint(firstSlot);
-        controller().mouse().moveTo(slotLoc, "medium");
-        controller().mouse().rightClick();
-        waitMillis(HumanBehavior.adjustDelay(400, 600));
-
-        Point depositOption = new Point(slotLoc.x, slotLoc.y + 85);
-        controller().mouse().moveTo(depositOption, "fast");
-        controller().mouse().leftClick();
-        waitMillis(HumanBehavior.adjustDelay(300, 500));
-
-        // Close bank and walk back
-        controller().keyboard().sendModifierKey(401, "esc");
-        waitMillis(HumanBehavior.adjustDelay(80, 120));
-        controller().keyboard().sendModifierKey(402, "esc");
-        waitMillis(HumanBehavior.adjustDelay(400, 600));
-
-        walkTo(MINE_TILE, "mine");
+        Bank.open(this, BANK_COLOUR);
+        Bank.depositAll(this);
+        Bank.close(this);
+        Walk.toOrStop(this, MINE_TILE, "mine");
         waitMillis(HumanBehavior.adjustDelay(600, 900));
-    }
-
-    /**
-     * Walks to the given tile using the Dax walker with error handling.
-     *
-     * @param destination the world tile to walk to
-     * @param label a label for logging
-     */
-    private void walkTo(Point destination, String label) {
-        try {
-            controller().walker().pathTo(destination, false);
-            waitRandomMillis(4000, 6000);
-        } catch (IOException e) {
-            logger.error("Walker error going to {}: {}", label, e.getMessage());
-            stop();
-        } catch (InterruptedException e) {
-            logger.error("Walker interrupted going to {}", label);
-            stop();
-        }
     }
 
     /**

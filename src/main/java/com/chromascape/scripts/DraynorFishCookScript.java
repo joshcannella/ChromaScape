@@ -2,15 +2,15 @@ package com.chromascape.scripts;
 
 import com.chromascape.api.DiscordNotification;
 import com.chromascape.base.BaseScript;
+import com.chromascape.utils.actions.ColourClick;
 import com.chromascape.utils.actions.Idler;
 import com.chromascape.utils.actions.Inventory;
 import com.chromascape.utils.actions.ItemDropper;
 import com.chromascape.utils.actions.KeyPress;
 import com.chromascape.utils.actions.Logout;
+import com.chromascape.utils.actions.Walk;
 import com.chromascape.utils.core.input.distribution.ClickDistribution;
 import com.chromascape.utils.core.screen.colour.ColourObj;
-import com.chromascape.utils.core.screen.topology.ChromaObj;
-import com.chromascape.utils.core.screen.topology.ColourContours;
 import com.chromascape.utils.core.screen.topology.TemplateMatching;
 import com.chromascape.utils.core.screen.window.ScreenManager;
 import com.chromascape.utils.actions.HumanBehavior;
@@ -18,7 +18,6 @@ import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 import java.time.LocalDateTime;
-import java.util.List;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.bytedeco.opencv.opencv_core.Scalar;
@@ -137,7 +136,7 @@ public class DraynorFishCookScript extends BaseScript {
     }
 
     // Determine state — check fire visibility once and reuse
-    boolean fireVisible = COOKING_ENABLED && isColourVisible(FIRE_COLOUR);
+    boolean fireVisible = COOKING_ENABLED && ColourClick.isVisible(this, FIRE_COLOUR);
 
     if (hasCooked && rawCount == 0) {
       state = State.DROP;
@@ -216,13 +215,13 @@ public class DraynorFishCookScript extends BaseScript {
   // ======================== FISH ========================
 
   private void fish() {
-    if (!isColourVisible(FISHING_SPOT_COLOUR)) {
+    if (!ColourClick.isVisible(this, FISHING_SPOT_COLOUR)) {
       logger.info("Fishing spot not visible, walking.");
-      walkTo(FISHING_TILE);
+      if (!Walk.to(this, FISHING_TILE, "fishing spot")) stuckCounter++;
       return;
     }
 
-    Point spotLoc = getColourClickPoint(FISHING_SPOT_COLOUR);
+    Point spotLoc = ColourClick.getClickPoint(this, FISHING_SPOT_COLOUR);
     if (spotLoc == null) {
       logger.warn("Could not get fishing spot click point.");
       stuckCounter++;
@@ -255,13 +254,13 @@ public class DraynorFishCookScript extends BaseScript {
       return;
     }
 
-    if (!isColourVisible(TREE_COLOUR)) {
+    if (!ColourClick.isVisible(this, TREE_COLOUR)) {
       logger.info("Tree not visible, walking.");
-      walkTo(TREE_TILE);
+      if (!Walk.to(this, TREE_TILE, "tree")) stuckCounter++;
       return;
     }
 
-    Point treeLoc = getColourClickPoint(TREE_COLOUR);
+    Point treeLoc = ColourClick.getClickPoint(this, TREE_COLOUR);
     if (treeLoc == null) {
       logger.warn("Could not get tree click point.");
       stuckCounter++;
@@ -287,7 +286,7 @@ public class DraynorFishCookScript extends BaseScript {
       return;
     }
 
-    if (isColourVisible(FIRE_COLOUR)) {
+    if (ColourClick.isVisible(this, FIRE_COLOUR)) {
       stuckCounter = 0;
       return;
     }
@@ -299,17 +298,17 @@ public class DraynorFishCookScript extends BaseScript {
 
     // Wait for fire to appear
     LocalDateTime deadline = LocalDateTime.now().plusSeconds(FIRE_TIMEOUT_SECONDS);
-    while (!isColourVisible(FIRE_COLOUR) && LocalDateTime.now().isBefore(deadline)) {
+    while (!ColourClick.isVisible(this, FIRE_COLOUR) && LocalDateTime.now().isBefore(deadline)) {
       checkInterrupted();
       waitMillis(500);
     }
 
-    if (isColourVisible(FIRE_COLOUR)) {
+    if (ColourClick.isVisible(this, FIRE_COLOUR)) {
       stuckCounter = 0;
     } else {
       // "Can't light fire here" — walk a tile away and retry next cycle
       logger.warn("Fire failed, relocating.");
-      walkTo(FIRE_RELOCATE_TILE);
+      if (!Walk.to(this, FIRE_RELOCATE_TILE, "fire relocate")) stuckCounter++;
     }
   }
 
@@ -321,7 +320,7 @@ public class DraynorFishCookScript extends BaseScript {
       return;
     }
 
-    if (!isColourVisible(FIRE_COLOUR)) {
+    if (!ColourClick.isVisible(this, FIRE_COLOUR)) {
       logger.info("Fire not visible, need to re-light.");
       stuckCounter++;
       return;
@@ -331,7 +330,7 @@ public class DraynorFishCookScript extends BaseScript {
     Inventory.clickItem(this, RAW_SHRIMP, INV_THRESHOLD, "medium");
     waitMillis(HumanBehavior.adjustDelay(200, 400));
 
-    Point fireLoc = getColourClickPoint(FIRE_COLOUR);
+    Point fireLoc = ColourClick.getClickPoint(this, FIRE_COLOUR);
     if (fireLoc == null) {
       logger.warn("Could not get fire click point.");
       stuckCounter++;
@@ -390,58 +389,6 @@ public class DraynorFishCookScript extends BaseScript {
         controller().keyboard().sendModifierKey(402, "shift");
         return;
       }
-    }
-  }
-
-  // ======================== COLOUR DETECTION ========================
-
-  /** Checks colour visibility. Always releases ChromaObj Mats. */
-  private boolean isColourVisible(ColourObj colour) {
-    BufferedImage gameView = controller().zones().getGameView();
-    List<ChromaObj> objs = ColourContours.getChromaObjsInColour(gameView, colour);
-    boolean found = !objs.isEmpty();
-    for (ChromaObj obj : objs) {
-      obj.release();
-    }
-    return found;
-  }
-
-  /**
-   * Gets a click point via ColourContours + ClickDistribution.
-   * Avoids PointSelector to prevent OpenCV crash on malformed contours.
-   */
-  private Point getColourClickPoint(ColourObj colour) {
-    BufferedImage gameView = controller().zones().getGameView();
-    List<ChromaObj> objs = ColourContours.getChromaObjsInColour(gameView, colour);
-    if (objs.isEmpty()) {
-      return null;
-    }
-    try {
-      ChromaObj closest = ColourContours.getChromaObjClosestToCentre(objs);
-      return ClickDistribution.generateRandomPoint(closest.boundingBox());
-    } catch (Exception e) {
-      logger.warn("Failed to generate click point: {}", e.getMessage());
-      return null;
-    } finally {
-      for (ChromaObj obj : objs) {
-        obj.release();
-      }
-    }
-  }
-
-  // ======================== NAVIGATION ========================
-
-  /** Walks to a tile. Increments stuckCounter on failure. */
-  private void walkTo(Point tile) {
-    try {
-      controller().walker().pathTo(tile, false);
-      waitMillis(HumanBehavior.adjustDelay(3000, 5000));
-    } catch (InterruptedException e) {
-      logger.error("Walker interrupted.");
-      stop();
-    } catch (Exception e) {
-      logger.error("Walker error: {}", e.getMessage());
-      stuckCounter++;
     }
   }
 

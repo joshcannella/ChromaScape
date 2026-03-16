@@ -4,6 +4,7 @@ import com.chromascape.api.DiscordNotification;
 import com.chromascape.base.BaseScript;
 import com.chromascape.utils.actions.Inventory;
 import com.chromascape.utils.actions.KeyPress;
+import com.chromascape.utils.actions.Walk;
 import com.chromascape.utils.core.input.distribution.ClickDistribution;
 import com.chromascape.utils.core.screen.window.ScreenManager;
 import com.chromascape.utils.actions.HumanBehavior;
@@ -66,13 +67,13 @@ public class RestlessGhostScript extends BaseScript {
 
     switch (step) {
       case ENTER_CHURCH -> {
-        walkTo(CHURCH_DOOR_TILE, "church door");
+        Walk.toOrStop(this, CHURCH_DOOR_TILE, "church door");
         clickGameCenter();
         waitMillis(HumanBehavior.adjustDelay(1500, 2500));
         step = Step.TALK_AERECK;
       }
       case TALK_AERECK -> {
-        walkTo(AERECK_TILE, "Father Aereck");
+        Walk.toOrStop(this, AERECK_TILE, "Father Aereck");
         clickGameCenter();
         waitMillis(HumanBehavior.adjustDelay(1500, 2500));
         KeyPress.space(this);
@@ -92,7 +93,7 @@ public class RestlessGhostScript extends BaseScript {
       case WALK_TO_URHNEY -> {
         // Separated from TALK_URHNEY so the walk completes before we attempt dialog.
         // If we already have the amulet, skipCompletedSteps will jump past this.
-        walkTo(URHNEY_TILE, "Father Urhney");
+        Walk.toOrStop(this, URHNEY_TILE, "Father Urhney");
         step = Step.TALK_URHNEY;
       }
       case TALK_URHNEY -> {
@@ -136,7 +137,7 @@ public class RestlessGhostScript extends BaseScript {
         }
       }
       case OPEN_COFFIN -> {
-        walkTo(COFFIN_TILE, "coffin");
+        Walk.toOrStop(this, COFFIN_TILE, "coffin");
         // Open the coffin
         clickGameCenter();
         waitMillis(HumanBehavior.adjustDelay(2500, 3500));
@@ -151,7 +152,7 @@ public class RestlessGhostScript extends BaseScript {
         step = Step.WALK_TO_TOWER;
       }
       case WALK_TO_TOWER -> {
-        walkTo(TOWER_ENTRANCE_TILE, "Wizards' Tower");
+        Walk.toOrStop(this, TOWER_ENTRANCE_TILE, "Wizards' Tower");
         step = Step.DESCEND_TOWER;
       }
       case DESCEND_TOWER -> {
@@ -167,7 +168,7 @@ public class RestlessGhostScript extends BaseScript {
       case GET_SKULL -> {
         if (!Inventory.hasItem(this, SKULL_IMAGE, MATCH_THRESHOLD)) {
           if (!walkedToAltar) {
-            walkTo(ALTAR_TILE, "altar");
+            Walk.toOrStop(this, ALTAR_TILE, "altar");
             walkedToAltar = true;
           }
           clickGameCenter();
@@ -191,7 +192,7 @@ public class RestlessGhostScript extends BaseScript {
         }
       }
       case RETURN_TO_COFFIN -> {
-        walkTo(COFFIN_TILE, "coffin");
+        Walk.toOrStop(this, COFFIN_TILE, "coffin");
         step = Step.USE_SKULL;
       }
       case USE_SKULL -> {
@@ -254,19 +255,6 @@ public class RestlessGhostScript extends BaseScript {
 
     controller().mouse().microJitter();
     controller().mouse().leftClick();
-  }
-
-  private void walkTo(Point destination, String label) {
-    try {
-      controller().walker().pathTo(destination, false);
-      waitRandomMillis(4000, 6000);
-    } catch (IOException e) {
-      logger.error("Walker error going to {}: {}", label, e.getMessage());
-      stop();
-    } catch (InterruptedException e) {
-      logger.error("Walker interrupted going to {}", label);
-      stop();
-    }
   }
 
   private boolean canWalkTo(Point destination) {
