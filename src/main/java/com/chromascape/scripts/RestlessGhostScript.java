@@ -6,7 +6,7 @@ import com.chromascape.utils.actions.Inventory;
 import com.chromascape.utils.actions.KeyPress;
 import com.chromascape.utils.core.input.distribution.ClickDistribution;
 import com.chromascape.utils.core.screen.window.ScreenManager;
-import com.chromascape.scripts.HumanBehavior;
+import com.chromascape.utils.actions.HumanBehavior;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.io.IOException;
@@ -59,22 +59,7 @@ public class RestlessGhostScript extends BaseScript {
 
   @Override
   protected void cycle() {
-    HumanBehavior.updateTempoDrift();
-
-    if (HumanBehavior.shouldTakeExtendedBreak()) {
-      HumanBehavior.performBreak(this, true);
-      return;
-    }
-    if (HumanBehavior.shouldTakeBreak()) {
-      HumanBehavior.performBreak(this, false);
-      return;
-    }
-    if (HumanBehavior.shouldFidgetCamera()) {
-      HumanBehavior.performCameraFidget(this);
-    }
-    if (HumanBehavior.shouldIdleDrift()) {
-      HumanBehavior.performIdleDrift(this);
-    }
+    if (HumanBehavior.runPreCycleChecks(this)) return;
 
     skipCompletedSteps();
     logger.info("Step: {}", step);

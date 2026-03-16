@@ -6,7 +6,6 @@ import com.chromascape.utils.actions.Idler;
 import com.chromascape.utils.actions.Inventory;
 import com.chromascape.utils.actions.ItemDropper;
 import com.chromascape.utils.actions.KeyPress;
-import com.chromascape.utils.actions.LevelUpDismisser;
 import com.chromascape.utils.actions.Logout;
 import com.chromascape.utils.core.input.distribution.ClickDistribution;
 import com.chromascape.utils.core.screen.colour.ColourObj;
@@ -14,7 +13,7 @@ import com.chromascape.utils.core.screen.topology.ChromaObj;
 import com.chromascape.utils.core.screen.topology.ColourContours;
 import com.chromascape.utils.core.screen.topology.TemplateMatching;
 import com.chromascape.utils.core.screen.window.ScreenManager;
-import com.chromascape.scripts.HumanBehavior;
+import com.chromascape.utils.actions.HumanBehavior;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
@@ -110,21 +109,7 @@ public class DraynorFishCookScript extends BaseScript {
   @Override
   protected void cycle() {
     // Humanization
-    HumanBehavior.updateTempoDrift();
-    if (HumanBehavior.shouldTakeExtendedBreak()) {
-      HumanBehavior.performBreak(this, true);
-      return;
-    }
-    if (HumanBehavior.shouldTakeBreak()) {
-      HumanBehavior.performBreak(this, false);
-      return;
-    }
-    if (HumanBehavior.shouldFidgetCamera()) {
-      HumanBehavior.performCameraFidget(this);
-    }
-
-    LevelUpDismisser.dismissIfPresent(this);
-
+    if (HumanBehavior.runPreCycleChecks(this)) return;
     // Stuck detection
     if (stuckCounter >= MAX_STUCK_CYCLES) {
       logger.error("Stuck for {} cycles, logging out.", MAX_STUCK_CYCLES);
