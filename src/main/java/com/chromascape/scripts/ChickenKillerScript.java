@@ -2,6 +2,7 @@ package com.chromascape.scripts;
 
 import com.chromascape.api.DiscordNotification;
 import com.chromascape.base.BaseScript;
+import com.chromascape.utils.actions.LevelUpDismisser;
 import com.chromascape.utils.actions.Minimap;
 import com.chromascape.utils.actions.MovingObject;
 import com.chromascape.utils.core.input.distribution.ClickDistribution;
@@ -85,7 +86,7 @@ public class ChickenKillerScript extends BaseScript {
       HumanBehavior.performIdleDrift(this);
     }
 
-    dismissLevelUp();
+    LevelUpDismisser.dismissIfPresent(this);
     fight();
   }
 
@@ -286,15 +287,6 @@ public class ChickenKillerScript extends BaseScript {
     waitMillis(HumanBehavior.adjustDelay(200, 400));
 
     logger.info("Switched to {} style", style);
-  }
-
-  // === Level-Up Detection ===
-
-  private void dismissLevelUp() {
-    controller().keyboard().sendModifierKey(401, "space");
-    waitMillis(HumanBehavior.adjustDelay(80, 120));
-    controller().keyboard().sendModifierKey(402, "space");
-    waitMillis(HumanBehavior.adjustDelay(100, 200));
   }
 
   public void onLevelUp() {

@@ -4,6 +4,7 @@ import com.chromascape.api.DiscordNotification;
 import com.chromascape.base.BaseScript;
 import com.chromascape.utils.actions.Idler;
 import com.chromascape.utils.actions.ItemDropper;
+import com.chromascape.utils.actions.LevelUpDismisser;
 import com.chromascape.utils.core.input.distribution.ClickDistribution;
 import com.chromascape.utils.core.screen.colour.ColourObj;
 import com.chromascape.utils.core.screen.topology.ChromaObj;
@@ -118,6 +119,8 @@ public class DraynorFishCookScript extends BaseScript {
     if (HumanBehavior.shouldFidgetCamera()) {
       HumanBehavior.performCameraFidget(this);
     }
+
+    LevelUpDismisser.dismissIfPresent(this);
 
     // Stuck detection
     if (stuckCounter >= MAX_STUCK_CYCLES) {

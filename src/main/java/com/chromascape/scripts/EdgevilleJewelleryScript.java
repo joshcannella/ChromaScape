@@ -2,6 +2,7 @@ package com.chromascape.scripts;
 
 import com.chromascape.base.BaseScript;
 import com.chromascape.utils.actions.Idler;
+import com.chromascape.utils.actions.LevelUpDismisser;
 import com.chromascape.utils.actions.PointSelector;
 import com.chromascape.utils.core.input.distribution.ClickDistribution;
 import com.chromascape.utils.core.screen.topology.MatchResult;
@@ -122,6 +123,8 @@ public class EdgevilleJewelleryScript extends BaseScript {
         if (HumanBehavior.shouldIdleDrift()) {
             HumanBehavior.performIdleDrift(this);
         }
+
+        LevelUpDismisser.dismissIfPresent(this);
 
         if (!hasMaterials()) {
             logger.info("No materials, banking");

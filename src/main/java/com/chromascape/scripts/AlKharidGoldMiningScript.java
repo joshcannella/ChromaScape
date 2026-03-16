@@ -2,6 +2,7 @@ package com.chromascape.scripts;
 
 import com.chromascape.base.BaseScript;
 import com.chromascape.utils.actions.Idler;
+import com.chromascape.utils.actions.LevelUpDismisser;
 import com.chromascape.utils.actions.PointSelector;
 import com.chromascape.utils.core.input.distribution.ClickDistribution;
 import com.chromascape.utils.core.screen.topology.TemplateMatching;
@@ -75,6 +76,8 @@ public class AlKharidGoldMiningScript extends BaseScript {
         if (HumanBehavior.shouldIdleDrift()) {
             HumanBehavior.performIdleDrift(this);
         }
+
+        LevelUpDismisser.dismissIfPresent(this);
 
         if (isInventoryFull()) {
             logger.info("Inventory full, banking gold ore");

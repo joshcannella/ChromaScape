@@ -2,6 +2,7 @@ package com.chromascape.scripts;
 
 import com.chromascape.api.DiscordNotification;
 import com.chromascape.base.BaseScript;
+import com.chromascape.utils.actions.LevelUpDismisser;
 import com.chromascape.utils.actions.Minimap;
 import com.chromascape.utils.actions.MovingObject;
 import com.chromascape.utils.actions.PointSelector;
@@ -74,6 +75,8 @@ public class DraynorAgilityScript extends BaseScript {
         if (HumanBehavior.shouldIdleDrift()) {
             HumanBehavior.performIdleDrift(this);
         }
+
+        LevelUpDismisser.dismissIfPresent(this);
 
         int previousXp = Minimap.getXp(this);
         if (previousXp == -1) {
