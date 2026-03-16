@@ -1,4 +1,4 @@
-package com.chromascape.utils.actions;
+package com.chromascape.utils.actions.custom;
 
 import com.chromascape.base.BaseScript;
 import java.awt.Point;

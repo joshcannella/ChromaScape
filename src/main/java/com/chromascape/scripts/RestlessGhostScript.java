@@ -2,12 +2,12 @@ package com.chromascape.scripts;
 
 import com.chromascape.api.DiscordNotification;
 import com.chromascape.base.BaseScript;
-import com.chromascape.utils.actions.Inventory;
-import com.chromascape.utils.actions.KeyPress;
-import com.chromascape.utils.actions.Walk;
+import com.chromascape.utils.actions.custom.Inventory;
+import com.chromascape.utils.actions.custom.KeyPress;
+import com.chromascape.utils.actions.custom.Walk;
 import com.chromascape.utils.core.input.distribution.ClickDistribution;
 import com.chromascape.utils.core.screen.window.ScreenManager;
-import com.chromascape.utils.actions.HumanBehavior;
+import com.chromascape.utils.actions.custom.HumanBehavior;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.io.IOException;

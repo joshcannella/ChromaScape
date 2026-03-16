@@ -2,14 +2,14 @@ package com.chromascape.scripts;
 
 import com.chromascape.api.DiscordNotification;
 import com.chromascape.base.BaseScript;
-import com.chromascape.utils.actions.ColourClick;
+import com.chromascape.utils.actions.custom.ColourClick;
 import com.chromascape.utils.actions.Minimap;
 import com.chromascape.utils.actions.MovingObject;
 import com.chromascape.utils.core.input.distribution.ClickDistribution;
 import com.chromascape.utils.core.screen.colour.ColourObj;
 import com.chromascape.utils.core.screen.topology.ChromaObj;
 import com.chromascape.utils.core.screen.topology.ColourContours;
-import com.chromascape.utils.actions.HumanBehavior;
+import com.chromascape.utils.actions.custom.HumanBehavior;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.image.BufferedImage;

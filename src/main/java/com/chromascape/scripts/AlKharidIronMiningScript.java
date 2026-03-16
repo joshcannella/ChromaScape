@@ -1,13 +1,13 @@
 package com.chromascape.scripts;
 
 import com.chromascape.base.BaseScript;
-import com.chromascape.utils.actions.Bank;
+import com.chromascape.utils.actions.custom.Bank;
 import com.chromascape.utils.actions.Idler;
 import com.chromascape.utils.actions.PointSelector;
-import com.chromascape.utils.actions.Walk;
+import com.chromascape.utils.actions.custom.Walk;
 import com.chromascape.utils.core.screen.topology.TemplateMatching;
 import com.chromascape.utils.core.screen.window.ScreenManager;
-import com.chromascape.utils.actions.HumanBehavior;
+import com.chromascape.utils.actions.custom.HumanBehavior;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.image.BufferedImage;

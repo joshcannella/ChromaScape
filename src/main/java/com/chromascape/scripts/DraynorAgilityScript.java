@@ -7,7 +7,7 @@ import com.chromascape.utils.actions.MovingObject;
 import com.chromascape.utils.actions.PointSelector;
 import com.chromascape.utils.core.screen.colour.ColourObj;
 import com.chromascape.utils.core.screen.topology.ColourContours;
-import com.chromascape.utils.actions.HumanBehavior;
+import com.chromascape.utils.actions.custom.HumanBehavior;
 import java.awt.Point;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
