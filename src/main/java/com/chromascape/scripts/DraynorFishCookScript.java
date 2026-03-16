@@ -4,7 +4,6 @@ import com.chromascape.api.DiscordNotification;
 import com.chromascape.base.BaseScript;
 import com.chromascape.utils.actions.Idler;
 import com.chromascape.utils.actions.ItemDropper;
-import com.chromascape.utils.actions.MovingObject;
 import com.chromascape.utils.core.input.distribution.ClickDistribution;
 import com.chromascape.utils.core.screen.colour.ColourObj;
 import com.chromascape.utils.core.screen.topology.ChromaObj;
@@ -17,7 +16,6 @@ import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.concurrent.ThreadLocalRandom;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.bytedeco.opencv.opencv_core.Scalar;
@@ -80,6 +78,8 @@ public class DraynorFishCookScript extends BaseScript {
   // === Walker Tiles (Draynor Village) ===
   private static final Point FISHING_TILE = new Point(3087, 3228);
   private static final Point TREE_TILE = new Point(3080, 3230);
+  // One tile offset from tree tile for fire relocation
+  private static final Point FIRE_RELOCATE_TILE = new Point(3081, 3231);
 
   // === Configuration ===
   private static final boolean COOKING_ENABLED = true; // set false to fish-and-drop only
@@ -94,6 +94,14 @@ public class DraynorFishCookScript extends BaseScript {
   private enum State { FISH, CHOP, LIGHT_FIRE, COOK, DROP }
   private State state = State.FISH;
   private int stuckCounter = 0;
+
+  // === Cached inventory scan results (refreshed each cycle) ===
+  private int rawCount;
+  private boolean hasCooked;
+  private boolean hasLogs;
+  private boolean hasTinderbox;
+  private boolean hasNet;
+  private int occupiedSlots;
 
   @Override
   protected void cycle() {
@@ -120,35 +128,42 @@ public class DraynorFishCookScript extends BaseScript {
       return;
     }
 
+    // Single inventory scan
+    scanInventory();
+
     // Prerequisites
-    if (COOKING_ENABLED && !hasItem(TINDERBOX)) {
+    if (COOKING_ENABLED && !hasTinderbox) {
       logger.error("No tinderbox in inventory.");
       DiscordNotification.send("DraynorFishCook: No tinderbox. Stopping.");
       stop();
       return;
     }
-    if (!hasItem(NET)) {
+    if (!hasNet) {
       logger.error("No small fishing net in inventory.");
       DiscordNotification.send("DraynorFishCook: No fishing net. Stopping.");
       stop();
       return;
     }
 
-    // Read inventory
-    int rawCount = countItem(RAW_SHRIMP);
-    boolean hasCooked = hasItem(COOKED_SHRIMP) || hasItem(BURNT_SHRIMP);
-    boolean hasLogs = hasItem(LOGS);
+    // Determine state — check fire visibility once and reuse
+    boolean fireVisible = COOKING_ENABLED && isColourVisible(FIRE_COLOUR);
 
-    // Determine state
-    if (rawCount == 0 && hasCooked) {
+    if (hasCooked && rawCount == 0) {
       state = State.DROP;
-    } else if (COOKING_ENABLED && rawCount >= TARGET_RAW && !hasLogs) {
+    } else if (hasCooked && rawCount > 0) {
+      // Mixed inventory (fire died mid-cook or leftover) — drop cooked first
+      state = State.DROP;
+    } else if (COOKING_ENABLED && rawCount >= TARGET_RAW && !hasLogs && !fireVisible) {
       state = State.CHOP;
-    } else if (COOKING_ENABLED && rawCount >= TARGET_RAW && hasLogs && !isColourVisible(FIRE_COLOUR)) {
+    } else if (COOKING_ENABLED && rawCount >= TARGET_RAW && hasLogs && !fireVisible) {
       state = State.LIGHT_FIRE;
-    } else if (COOKING_ENABLED && rawCount >= TARGET_RAW && isColourVisible(FIRE_COLOUR)) {
+    } else if (COOKING_ENABLED && rawCount >= TARGET_RAW && fireVisible) {
       state = State.COOK;
     } else if (!COOKING_ENABLED && rawCount >= TARGET_RAW) {
+      state = State.DROP;
+    } else if (occupiedSlots >= 28) {
+      // Inventory full but doesn't match any expected state — drop everything except tools
+      logger.warn("Inventory full with unexpected items, dropping.");
       state = State.DROP;
     } else {
       state = State.FISH;
@@ -158,33 +173,76 @@ public class DraynorFishCookScript extends BaseScript {
         state, rawCount, hasLogs, hasCooked, stuckCounter);
 
     switch (state) {
-      case FISH -> fish(rawCount);
-      case CHOP -> chop(rawCount);
+      case FISH -> fish();
+      case CHOP -> chop();
       case LIGHT_FIRE -> lightFire();
-      case COOK -> cook(rawCount);
+      case COOK -> cook();
       case DROP -> drop();
+    }
+  }
+
+  // ======================== INVENTORY SCAN ========================
+
+  /** Scans all 28 slots once and caches results for the entire cycle. */
+  private void scanInventory() {
+    rawCount = 0;
+    hasCooked = false;
+    hasLogs = false;
+    hasTinderbox = false;
+    hasNet = false;
+    occupiedSlots = 0;
+
+    for (int i = 0; i < 28; i++) {
+      Rectangle slot = controller().zones().getInventorySlots().get(i);
+      BufferedImage slotImg = ScreenManager.captureZone(slot);
+
+      if (TemplateMatching.match(RAW_SHRIMP, slotImg, INV_THRESHOLD).success()) {
+        rawCount++;
+        occupiedSlots++;
+      } else if (!hasCooked && TemplateMatching.match(COOKED_SHRIMP, slotImg, INV_THRESHOLD).success()) {
+        hasCooked = true;
+        occupiedSlots++;
+      } else if (!hasCooked && TemplateMatching.match(BURNT_SHRIMP, slotImg, INV_THRESHOLD).success()) {
+        hasCooked = true;
+        occupiedSlots++;
+      } else if (!hasLogs && TemplateMatching.match(LOGS, slotImg, INV_THRESHOLD).success()) {
+        hasLogs = true;
+        occupiedSlots++;
+      } else if (!hasTinderbox && TemplateMatching.match(TINDERBOX, slotImg, INV_THRESHOLD).success()) {
+        hasTinderbox = true;
+        occupiedSlots++;
+      } else if (!hasNet && TemplateMatching.match(NET, slotImg, INV_THRESHOLD).success()) {
+        hasNet = true;
+        occupiedSlots++;
+      } else {
+        // Check if slot is non-empty (any match at all means occupied)
+        // For occupied count, we already counted known items above.
+        // Unknown items won't be counted perfectly, but the known items cover the normal case.
+      }
     }
   }
 
   // ======================== FISH ========================
 
-  private void fish(int rawBefore) {
+  private void fish() {
     if (!isColourVisible(FISHING_SPOT_COLOUR)) {
       logger.info("Fishing spot not visible, walking.");
       walkTo(FISHING_TILE);
-      stuckCounter++;
       return;
     }
 
-    if (!MovingObject.clickMovingObjectByColourObjUntilRedClick(FISHING_SPOT_COLOUR, this)) {
-      logger.warn("Failed to click fishing spot.");
+    Point spotLoc = getColourClickPoint(FISHING_SPOT_COLOUR);
+    if (spotLoc == null) {
+      logger.warn("Could not get fishing spot click point.");
       stuckCounter++;
       return;
     }
+    controller().mouse().moveTo(spotLoc, "medium");
+    controller().mouse().leftClick();
 
+    int rawBefore = rawCount;
     Idler.waitUntilIdle(this, 120);
 
-    // Check progress
     if (countItem(RAW_SHRIMP) > rawBefore) {
       stuckCounter = 0;
     } else {
@@ -194,8 +252,8 @@ public class DraynorFishCookScript extends BaseScript {
 
   // ======================== CHOP ========================
 
-  private void chop(int rawCount) {
-    if (hasItem(LOGS)) {
+  private void chop() {
+    if (hasLogs) {
       stuckCounter = 0;
       return;
     }
@@ -209,7 +267,6 @@ public class DraynorFishCookScript extends BaseScript {
     if (!isColourVisible(TREE_COLOUR)) {
       logger.info("Tree not visible, walking.");
       walkTo(TREE_TILE);
-      stuckCounter++;
       return;
     }
 
@@ -252,27 +309,22 @@ public class DraynorFishCookScript extends BaseScript {
     // Wait for fire to appear
     LocalDateTime deadline = LocalDateTime.now().plusSeconds(FIRE_TIMEOUT_SECONDS);
     while (!isColourVisible(FIRE_COLOUR) && LocalDateTime.now().isBefore(deadline)) {
+      checkInterrupted();
       waitMillis(500);
     }
 
     if (isColourVisible(FIRE_COLOUR)) {
       stuckCounter = 0;
     } else {
-      // "Can't light fire here" — walk a tile in a random direction and retry
-      logger.warn("Fire failed, moving a tile.");
-      String[] dirs = {"up", "down", "left", "right"};
-      String dir = dirs[ThreadLocalRandom.current().nextInt(4)];
-      controller().keyboard().sendArrowKey(401, dir);
-      waitMillis(HumanBehavior.adjustDelay(80, 120));
-      controller().keyboard().sendArrowKey(402, dir);
-      waitMillis(HumanBehavior.adjustDelay(1000, 1500));
-      stuckCounter++;
+      // "Can't light fire here" — walk a tile away and retry next cycle
+      logger.warn("Fire failed, relocating.");
+      walkTo(FIRE_RELOCATE_TILE);
     }
   }
 
   // ======================== COOK ========================
 
-  private void cook(int rawBefore) {
+  private void cook() {
     if (!hasItem(RAW_SHRIMP)) {
       stuckCounter = 0;
       return;
@@ -301,17 +353,9 @@ public class DraynorFishCookScript extends BaseScript {
     waitMillis(HumanBehavior.adjustDelay(1500, 2500));
     pressSpace();
 
-    // Quick check — if idle returns almost instantly with no change, dialog didn't open
-    boolean quickIdle = Idler.waitUntilIdle(this, 5);
-    if (quickIdle && countItem(RAW_SHRIMP) == rawBefore) {
-      logger.warn("Cook dialog may not have opened, retrying.");
-      stuckCounter++;
-      return;
-    }
-
-    // Wait for full cook
+    // Wait for full cook — Idler handles the blocking
     Idler.waitUntilIdle(this, 90);
-    stuckCounter = 0; // progress was made even if fire died mid-cook
+    stuckCounter = 0;
   }
 
   // ======================== DROP ========================
@@ -443,7 +487,7 @@ public class DraynorFishCookScript extends BaseScript {
 
   // ======================== NAVIGATION ========================
 
-  /** Catches Exception broadly to handle OCR failures in walker. */
+  /** Walks to a tile. Increments stuckCounter on failure. */
   private void walkTo(Point tile) {
     try {
       controller().walker().pathTo(tile, false);
@@ -453,6 +497,7 @@ public class DraynorFishCookScript extends BaseScript {
       stop();
     } catch (Exception e) {
       logger.error("Walker error: {}", e.getMessage());
+      stuckCounter++;
     }
   }
 
@@ -465,13 +510,17 @@ public class DraynorFishCookScript extends BaseScript {
   }
 
   private void pressLogout() {
+    // Click the logout tab to switch the panel
     Rectangle logoutTab = controller().zones().getCtrlPanel().get("logoutTab");
     controller().mouse().moveTo(ClickDistribution.generateRandomPoint(logoutTab), "medium");
     controller().mouse().leftClick();
     waitMillis(HumanBehavior.adjustDelay(400, 600));
-    // Click the logout button within the panel
+    // The logout button is roughly centered in the upper portion of the panel
     Rectangle panel = controller().zones().getCtrlPanel().get("inventoryPanel");
-    controller().mouse().moveTo(ClickDistribution.generateRandomPoint(panel), "medium");
+    int btnX = panel.x + panel.width / 2 - 40;
+    int btnY = panel.y + panel.height / 2 - 20;
+    Rectangle logoutBtn = new Rectangle(btnX, btnY, 80, 30);
+    controller().mouse().moveTo(ClickDistribution.generateRandomPoint(logoutBtn), "medium");
     controller().mouse().leftClick();
   }
 }

@@ -4,13 +4,10 @@ import com.chromascape.api.DiscordNotification;
 import com.chromascape.base.BaseScript;
 import com.chromascape.utils.actions.Minimap;
 import com.chromascape.utils.actions.MovingObject;
-import com.chromascape.utils.actions.PointSelector;
 import com.chromascape.utils.core.input.distribution.ClickDistribution;
 import com.chromascape.utils.core.screen.colour.ColourObj;
 import com.chromascape.utils.core.screen.topology.ChromaObj;
 import com.chromascape.utils.core.screen.topology.ColourContours;
-import com.chromascape.utils.core.screen.topology.TemplateMatching;
-import com.chromascape.utils.core.screen.window.ScreenManager;
 import com.chromascape.scripts.HumanBehavior;
 import java.awt.Point;
 import java.awt.Rectangle;
@@ -23,13 +20,13 @@ import org.apache.logging.log4j.Logger;
 import org.bytedeco.opencv.opencv_core.Scalar;
 
 /**
- * Kills chickens at the Lumbridge chicken coop, loots feathers and bones, and buries bones for
- * Prayer XP. Rotates attack styles (Strength → Attack → Defence) based on levels gained.
+ * Kills chickens at the Lumbridge chicken coop and loots feathers. Rotates attack styles
+ * (Strength → Attack → Defence) based on levels gained.
  *
  * <p><b>RuneLite Setup:</b>
  * <ul>
  *   <li>NPC Indicators — highlight "Chicken" in cyan (HSV ~90, 254-255, 254-255)</li>
- *   <li>Ground Items — highlight "Feather" and "Bones" in purple (HSV ~150, 254-255, 254-255)</li>
+ *   <li>Ground Items — highlight "Feather" in purple (HSV ~140, 237-255, 205-255)</li>
  *   <li>XP bar set to permanent (required for XP-based kill detection)</li>
  *   <li>Windows Display Scaling: 100%</li>
  *   <li>RuneScape UI: "Fixed - Classic"</li>
@@ -41,29 +38,25 @@ public class ChickenKillerScript extends BaseScript {
 
   private static final Logger logger = LogManager.getLogger(ChickenKillerScript.class);
 
-  // === Image Templates (inventory only) ===
-  private static final String BONES_IMAGE = "/images/user/Bones.png";
-
   // === Colour Definitions ===
   private static final ColourObj CHICKEN_COLOUR =
       new ColourObj("cyan", new Scalar(90, 254, 254, 0), new Scalar(91, 255, 255, 0));
   private static final ColourObj LOOT_COLOUR =
-      new ColourObj("purple", new Scalar(140, 237, 205, 0), new Scalar(142, 255, 255, 0));
+      new ColourObj("purple", new Scalar(139, 200, 200, 0), new Scalar(141, 255, 255, 0));
 
-  private static final int BONES_BURY_THRESHOLD = 20;
-  private static final int LOOT_EVERY_N_KILLS = 5;
-  private static final double INVENTORY_THRESHOLD = 0.07;
+  // === Configuration ===
+  // NOTE: Looting is not fully working — keep this false for now
+  private static final boolean LOOT_FEATHERS = false;
 
   // === Walker ===
+  private static final Point COOP_GATE = new Point(3237, 3295);
   private static final Point COOP_CENTER = new Point(3235, 3295);
 
   // === Timeouts ===
   private static final int KILL_TIMEOUT_SECONDS = 15;
-  private static final int LOOT_APPEAR_TIMEOUT_SECONDS = 3;
   private static final int CHICKEN_XP = 12; // 3 HP × 4 XP per damage
   private static final int MAX_COMBAT_FAILURES = 10;
   private int combatFailures = 0;
-  private int killsSinceLoot = 0;
 
   // === Attack Style Rotation ===
   private static final int LEVELS_PER_ROTATION_STR = 2;
@@ -73,10 +66,6 @@ public class ChickenKillerScript extends BaseScript {
   private enum AttackStyle { STRENGTH, ATTACK, DEFENCE }
   private AttackStyle currentStyle = AttackStyle.STRENGTH;
   private int levelsGainedThisRotation = 0;
-
-  // === State Machine ===
-  private enum State { FIGHT, LOOT, BURY_BONES }
-  private State state = State.FIGHT;
 
   @Override
   protected void cycle() {
@@ -97,27 +86,13 @@ public class ChickenKillerScript extends BaseScript {
     }
 
     dismissLevelUp();
-
-    // If we have enough bones, bury them
-    if (countBones() >= BONES_BURY_THRESHOLD) {
-      state = State.BURY_BONES;
-    }
-
-    logger.info("State: {}", state);
-
-    switch (state) {
-      case FIGHT -> fight();
-      case LOOT -> loot();
-      case BURY_BONES -> buryBones();
-    }
+    fight();
   }
 
-  /**
-   * Attacks a chicken using MovingObject (red-click verified), then waits for XP change
-   * to confirm the kill. This is the same proven pattern used by the agility script.
-   */
+  private static final int MAX_ENGAGE_ATTEMPTS = 3;
+  private static final int ENGAGE_TIMEOUT_MS = 2000;
+
   private void fight() {
-    // Check if a chicken is visible
     if (!isColourVisible(CHICKEN_COLOUR)) {
       logger.warn("No chicken found, failure {}/{}", combatFailures + 1, MAX_COMBAT_FAILURES);
       combatFailures++;
@@ -131,88 +106,95 @@ public class ChickenKillerScript extends BaseScript {
       return;
     }
 
-    // Click the chicken — MovingObject handles retries and red-click verification
-    int previousXp = -1;
+    int previousXp;
     try {
       previousXp = Minimap.getXp(this);
     } catch (Exception e) {
-      logger.warn("Could not read XP, retrying next cycle");
+      logger.warn("XP read failed: {}", e.getMessage());
       return;
     }
-    if (!MovingObject.clickMovingObjectByColourObjUntilRedClick(CHICKEN_COLOUR, this)) {
-      logger.warn("Failed to red-click chicken");
-      combatFailures++;
-      return;
+    logger.info("XP snapshot: {}", previousXp);
+
+    // Try clicking chickens until one is actually engaged (first XP hit)
+    for (int attempt = 0; attempt < MAX_ENGAGE_ATTEMPTS; attempt++) {
+      if (!MovingObject.clickMovingObjectByColourObjUntilRedClick(CHICKEN_COLOUR, this)) {
+        logger.warn("Failed to red-click chicken (attempt {})", attempt + 1);
+        continue;
+      }
+
+      // Wait up to 2s for first XP gain to confirm combat engagement
+      if (waitForFirstHit(previousXp)) {
+        logger.info("In combat, waiting for kill...");
+        combatFailures = 0;
+        waitForKill(previousXp);
+        return;
+      }
+      logger.warn("Chicken unreachable (attempt {}), trying another", attempt + 1);
     }
 
-    combatFailures = 0;
-    logger.info("Attacked chicken, waiting for kill...");
+    logger.warn("Could not engage any chicken after {} attempts", MAX_ENGAGE_ATTEMPTS);
+    combatFailures++;
+  }
 
-    // Wait until we gain at least 12 XP (one chicken kill: 3 HP × 4 XP)
-    // This avoids false positives from other players' loot already on the ground
+  private boolean waitForFirstHit(int previousXp) {
+    LocalDateTime deadline = LocalDateTime.now().plusNanos(ENGAGE_TIMEOUT_MS * 1_000_000L);
+    while (LocalDateTime.now().isBefore(deadline)) {
+      try {
+        if (Minimap.getXp(this) > previousXp) {
+          return true;
+        }
+      } catch (Exception ignored) {}
+      waitMillis(200);
+    }
+    return false;
+  }
+
+  private void waitForKill(int previousXp) {
     LocalDateTime deadline = LocalDateTime.now().plusSeconds(KILL_TIMEOUT_SECONDS);
     while (LocalDateTime.now().isBefore(deadline)) {
       try {
-        int currentXp = Minimap.getXp(this);
-        if (currentXp - previousXp >= CHICKEN_XP) {
-          logger.info("Kill confirmed via XP (+{})", currentXp - previousXp);
-          killsSinceLoot++;
-          // Wait for death animation to finish before next action
+        int delta = Minimap.getXp(this) - previousXp;
+        if (delta >= CHICKEN_XP && delta < 100) {
+          logger.info("Kill confirmed via XP (+{})", delta);
           waitMillis(HumanBehavior.adjustDelay(600, 900));
-          if (killsSinceLoot >= LOOT_EVERY_N_KILLS) {
-            state = State.LOOT;
-            killsSinceLoot = 0;
+          if (LOOT_FEATHERS) {
+            Point lootLoc = findNearestLoot();
+            if (lootLoc != null) {
+              controller().mouse().moveTo(lootLoc, "fast");
+              controller().mouse().leftClick();
+              logger.info("Clicked feather loot at {}", lootLoc);
+              waitMillis(HumanBehavior.adjustDelay(300, 500));
+            }
           }
+          checkStyleRotation();
           return;
         }
-      } catch (Exception e) {
-        // OCR misread — keep polling
-      }
+      } catch (Exception ignored) {}
       waitMillis(300);
     }
-
-    // Timed out — chicken was stolen or we failed, try again
     logger.info("Kill timeout — retrying");
   }
 
-  private void loot() {
-    // Wait briefly for loot highlight to appear if not visible yet
-    if (!isColourVisible(LOOT_COLOUR)) {
-      LocalDateTime deadline = LocalDateTime.now().plusSeconds(LOOT_APPEAR_TIMEOUT_SECONDS);
-      while (!isColourVisible(LOOT_COLOUR) && LocalDateTime.now().isBefore(deadline)) {
-        waitMillis(300);
+  // === Colour Utilities ===
+
+  private Point findNearestLoot() {
+    BufferedImage gameView = controller().zones().getGameView();
+    List<ChromaObj> objs = ColourContours.getChromaObjsInColour(gameView, LOOT_COLOUR);
+    if (objs.isEmpty()) {
+      return null;
+    }
+    try {
+      ChromaObj nearest = ColourContours.getChromaObjClosestToCentre(objs);
+      return ClickDistribution.generateRandomPoint(nearest.boundingBox(), 15.0);
+    } catch (Exception e) {
+      logger.warn("Failed to generate loot point: {}", e.getMessage());
+      return null;
+    } finally {
+      for (ChromaObj obj : objs) {
+        obj.release();
       }
     }
-
-    Point lootLoc = findGroundItemByColour(LOOT_COLOUR);
-    if (lootLoc != null) {
-      controller().mouse().moveTo(lootLoc, "medium");
-      controller().mouse().leftClick();
-      waitMillis(HumanBehavior.adjustDelay(800, 1200));
-      // Stay in LOOT to pick up remaining items
-      return;
-    }
-
-    // Nothing left — bury bones only if inventory is full
-    if (countBones() >= BONES_BURY_THRESHOLD) {
-      state = State.BURY_BONES;
-    } else {
-      checkStyleRotation();
-      state = State.FIGHT;
-    }
   }
-
-  private void buryBones() {
-    // Bury all bones in inventory
-    while (hasItem(BONES_IMAGE)) {
-      clickInventoryItem(BONES_IMAGE);
-      waitMillis(HumanBehavior.adjustDelay(1200, 1600));
-    }
-    checkStyleRotation();
-    state = State.FIGHT;
-  }
-
-  // === Colour Utilities ===
 
   private boolean isColourVisible(ColourObj colour) {
     BufferedImage gameView = controller().zones().getGameView();
@@ -224,83 +206,29 @@ public class ChickenKillerScript extends BaseScript {
     return found;
   }
 
-  private Point findGroundItemByColour(ColourObj colour) {
-    BufferedImage gameView = controller().zones().getGameView();
-    List<ChromaObj> objs = ColourContours.getChromaObjsInColour(gameView, colour);
-    if (objs.isEmpty()) {
-      return null;
-    }
-    try {
-      // Pick the smallest contour to avoid merged adjacent tiles
-      ChromaObj smallest = objs.get(0);
-      for (ChromaObj obj : objs) {
-        if (obj.boundingBox().width * obj.boundingBox().height
-            < smallest.boundingBox().width * smallest.boundingBox().height) {
-          smallest = obj;
-        }
-      }
-      return ClickDistribution.generateRandomPoint(smallest.boundingBox(), 15.0);
-    } catch (Exception e) {
-      logger.warn("Failed to generate loot point: {}", e.getMessage());
-      return null;
-    } finally {
-      for (ChromaObj obj : objs) {
-        obj.release();
-      }
-    }
-  }
-
-  // === Inventory Utilities ===
-
-  private int countBones() {
-    int count = 0;
-    for (int i = 0; i < 28; i++) {
-      Rectangle slot = controller().zones().getInventorySlots().get(i);
-      BufferedImage slotImg = ScreenManager.captureZone(slot);
-      if (TemplateMatching.match(BONES_IMAGE, slotImg, INVENTORY_THRESHOLD).success()) {
-        count++;
-      }
-    }
-    return count;
-  }
-
-  private boolean hasItem(String templatePath) {
-    for (int i = 0; i < 28; i++) {
-      Rectangle slot = controller().zones().getInventorySlots().get(i);
-      BufferedImage slotImg = ScreenManager.captureZone(slot);
-      if (TemplateMatching.match(templatePath, slotImg, INVENTORY_THRESHOLD).success()) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  private void clickInventoryItem(String templatePath) {
-    for (int i = 0; i < 28; i++) {
-      Rectangle slot = controller().zones().getInventorySlots().get(i);
-      BufferedImage slotImg = ScreenManager.captureZone(slot);
-      if (TemplateMatching.match(templatePath, slotImg, INVENTORY_THRESHOLD).success()) {
-        Point clickLoc = ClickDistribution.generateRandomPoint(slot);
-        controller().mouse().moveTo(clickLoc, "medium");
-        controller().mouse().leftClick();
-        return;
-      }
-    }
-    logger.warn("Item not found in inventory: {}", templatePath);
-  }
-
   // === Recovery ===
 
   private void recoverToCoop() {
     try {
-      logger.info("Walking back to chicken coop");
+      // Walk to gate, click it to open if closed, then walk inside
+      logger.info("Walking to coop gate");
+      controller().walker().pathTo(COOP_GATE, false);
+      waitMillis(HumanBehavior.adjustDelay(1000, 1500));
+      // Click center to interact with gate
+      BufferedImage gameView = controller().zones().getGameView();
+      Point center = new Point(gameView.getWidth() / 2, gameView.getHeight() / 2);
+      controller().mouse().moveTo(center, "medium");
+      controller().mouse().leftClick();
+      waitMillis(HumanBehavior.adjustDelay(1500, 2500));
+      // Walk inside the coop
+      logger.info("Walking into coop");
       controller().walker().pathTo(COOP_CENTER, false);
-      waitMillis(HumanBehavior.adjustDelay(3000, 5000));
-    } catch (IOException e) {
-      logger.error("Walker error: {}", e.getMessage());
+      waitMillis(HumanBehavior.adjustDelay(2000, 3000));
     } catch (InterruptedException e) {
       logger.error("Walker interrupted");
       stop();
+    } catch (Exception e) {
+      logger.warn("Recovery error: {}", e.getMessage());
     }
   }
 
