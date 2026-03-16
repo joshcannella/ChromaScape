@@ -2,6 +2,8 @@ package com.chromascape.scripts;
 
 import com.chromascape.api.DiscordNotification;
 import com.chromascape.base.BaseScript;
+import com.chromascape.utils.actions.Inventory;
+import com.chromascape.utils.actions.KeyPress;
 import com.chromascape.utils.actions.MouseOver;
 import com.chromascape.utils.core.input.distribution.ClickDistribution;
 import com.chromascape.utils.core.screen.topology.TemplateMatching;
@@ -126,7 +128,7 @@ public class CooksAssistantScript extends BaseScript {
 
         switch (step) {
             case GET_POT -> {
-                if (!hasItem(POT_IMAGE)) {
+                if (!Inventory.hasItem(this, POT_IMAGE, MATCH_THRESHOLD)) {
                     walkTo(POT_TILE, "pot");
                     Point potLoc = findImageInGameView(POT_IMAGE);
                     if (potLoc != null) {
@@ -149,7 +151,7 @@ public class CooksAssistantScript extends BaseScript {
                 step = Step.GET_BUCKET;
             }
             case GET_BUCKET -> {
-                if (!hasItem(BUCKET_IMAGE)) {
+                if (!Inventory.hasItem(this, BUCKET_IMAGE, MATCH_THRESHOLD)) {
                     walkTo(BUCKET_TILE, "bucket");
                     Point bucketLoc = findImageInGameView(BUCKET_IMAGE);
                     if (bucketLoc != null) {
@@ -172,7 +174,7 @@ public class CooksAssistantScript extends BaseScript {
                 step = Step.GET_EGG;
             }
             case GET_EGG -> {
-                if (!hasItem(EGG_IMAGE)) {
+                if (!Inventory.hasItem(this, EGG_IMAGE, MATCH_THRESHOLD)) {
                     walkTo(EGG_TILE, "egg");
                     // Try template matching first with relaxed threshold
                     Point eggLoc = findImageInGameView(EGG_IMAGE, 0.15);
@@ -190,9 +192,9 @@ public class CooksAssistantScript extends BaseScript {
                 }
             }
             case GET_MILK -> {
-                if (!hasItem(MILK_IMAGE)) {
+                if (!Inventory.hasItem(this, MILK_IMAGE, MATCH_THRESHOLD)) {
                     walkTo(DAIRY_COW_TILE, "dairy cow");
-                    clickInventoryItem(BUCKET_IMAGE);
+                    Inventory.clickItem(this, BUCKET_IMAGE, MATCH_THRESHOLD, "medium");
                     waitMillis(HumanBehavior.adjustDelay(300, 500));
                     clickGameCenter();
                     waitMillis(HumanBehavior.adjustDelay(3000, 4000));
@@ -201,7 +203,7 @@ public class CooksAssistantScript extends BaseScript {
                 }
             }
             case GET_GRAIN -> {
-                if (!hasItem(GRAIN_IMAGE)) {
+                if (!Inventory.hasItem(this, GRAIN_IMAGE, MATCH_THRESHOLD)) {
                     walkTo(WHEAT_TILE, "wheat");
                     clickGameCenter(); // Wheat is tall and visible at center
                     waitMillis(HumanBehavior.adjustDelay(1200, 1800));
@@ -219,8 +221,8 @@ public class CooksAssistantScript extends BaseScript {
                 step = Step.MILL_USE_HOPPER;
             }
             case MILL_USE_HOPPER -> {
-                if (hasItem(GRAIN_IMAGE)) {
-                    clickInventoryItem(GRAIN_IMAGE);
+                if (Inventory.hasItem(this, GRAIN_IMAGE, MATCH_THRESHOLD)) {
+                    Inventory.clickItem(this, GRAIN_IMAGE, MATCH_THRESHOLD, "medium");
                     waitMillis(HumanBehavior.adjustDelay(300, 500));
                     clickGameCenter();
                     waitMillis(HumanBehavior.adjustDelay(1500, 2500));
@@ -242,8 +244,8 @@ public class CooksAssistantScript extends BaseScript {
                 step = Step.MILL_GET_FLOUR;
             }
             case MILL_GET_FLOUR -> {
-                if (!hasItem(FLOUR_IMAGE)) {
-                    clickInventoryItem(POT_IMAGE);
+                if (!Inventory.hasItem(this, FLOUR_IMAGE, MATCH_THRESHOLD)) {
+                    Inventory.clickItem(this, POT_IMAGE, MATCH_THRESHOLD, "medium");
                     waitMillis(HumanBehavior.adjustDelay(300, 500));
                     clickGameCenter();
                     waitMillis(HumanBehavior.adjustDelay(1500, 2500));
@@ -256,14 +258,14 @@ public class CooksAssistantScript extends BaseScript {
                 clickGameCenter();
                 waitMillis(HumanBehavior.adjustDelay(1500, 2500));
                 // Dialogue: "What's wrong?" → 1, "Can I help?" → 1
-                pressKey('1');
+                KeyPress.character(this, '1');
                 waitMillis(HumanBehavior.adjustDelay(1500, 2500));
-                pressKey('1');
+                KeyPress.character(this, '1');
                 waitMillis(HumanBehavior.adjustDelay(1500, 2500));
                 // Continue through remaining dialogue
                 for (int i = 0; i < 8; i++) {
                     checkInterrupted();
-                    pressSpace();
+                    KeyPress.space(this);
                     waitMillis(HumanBehavior.adjustDelay(800, 1200));
                 }
                 step = Step.DONE;
@@ -280,25 +282,25 @@ public class CooksAssistantScript extends BaseScript {
      * Advances past steps whose items are already in inventory.
      */
     private void skipCompletedSteps() {
-        if (step == Step.GET_POT && hasItem(POT_IMAGE)) {
+        if (step == Step.GET_POT && Inventory.hasItem(this, POT_IMAGE, MATCH_THRESHOLD)) {
             step = Step.GO_TO_CELLAR;
         }
         if ((step == Step.GO_TO_CELLAR || step == Step.GET_BUCKET || step == Step.LEAVE_CELLAR)
-                && (hasItem(BUCKET_IMAGE) || hasItem(MILK_IMAGE))) {
+                && (Inventory.hasItem(this, BUCKET_IMAGE, MATCH_THRESHOLD) || Inventory.hasItem(this, MILK_IMAGE, MATCH_THRESHOLD))) {
             step = Step.GET_EGG;
         }
-        if (step == Step.GET_EGG && hasItem(EGG_IMAGE)) {
+        if (step == Step.GET_EGG && Inventory.hasItem(this, EGG_IMAGE, MATCH_THRESHOLD)) {
             step = Step.GET_MILK;
         }
-        if (step == Step.GET_MILK && hasItem(MILK_IMAGE)) {
+        if (step == Step.GET_MILK && Inventory.hasItem(this, MILK_IMAGE, MATCH_THRESHOLD)) {
             step = Step.GET_GRAIN;
         }
         if (step.ordinal() >= Step.GET_GRAIN.ordinal()
                 && step.ordinal() <= Step.MILL_GET_FLOUR.ordinal()
-                && hasItem(FLOUR_IMAGE)) {
+                && Inventory.hasItem(this, FLOUR_IMAGE, MATCH_THRESHOLD)) {
             step = Step.DELIVER;
         }
-        if (step == Step.GET_GRAIN && hasItem(GRAIN_IMAGE)) {
+        if (step == Step.GET_GRAIN && Inventory.hasItem(this, GRAIN_IMAGE, MATCH_THRESHOLD)) {
             step = Step.MILL_CLIMB_UP;
         }
     }
@@ -338,38 +340,10 @@ public class CooksAssistantScript extends BaseScript {
      *
      * @param templatePath classpath path to the item image
      */
-    private void clickInventoryItem(String templatePath) {
-        for (int i = 0; i < 28; i++) {
-            Rectangle slot = controller().zones().getInventorySlots().get(i);
-            BufferedImage slotImg = ScreenManager.captureZone(slot);
-            if (TemplateMatching.match(templatePath, slotImg, MATCH_THRESHOLD).success()) {
-                Point clickLoc = ClickDistribution.generateRandomPoint(slot);
-                controller().mouse().moveTo(clickLoc, "medium");
-                controller().mouse().leftClick();
-                return;
-            }
-        }
-        logger.error("Item not found in inventory: {}", templatePath);
-        stop();
-    }
-
-    /**
-     * Searches for an image template in the game view and returns a random click point.
-     *
-     * @param templatePath classpath path to the item image
-     * @return random point within the matched region, or null if not found
-     */
     private Point findImageInGameView(String templatePath) {
         return findImageInGameView(templatePath, MATCH_THRESHOLD);
     }
 
-    /**
-     * Searches for an image template in the game view with custom threshold.
-     *
-     * @param templatePath classpath path to the item image
-     * @param threshold custom matching threshold
-     * @return random point within the matched region, or null if not found
-     */
     private Point findImageInGameView(String templatePath, double threshold) {
         BufferedImage gameView = controller().zones().getGameView();
         var match = TemplateMatching.match(templatePath, gameView, threshold);
@@ -379,24 +353,6 @@ public class CooksAssistantScript extends BaseScript {
         return null;
     }
 
-    /**
-     * Checks if an item is present anywhere in the inventory.
-     *
-     * @param templatePath classpath path to the item image
-     * @return true if found in any slot
-     */
-    private boolean hasItem(String templatePath) {
-        for (int i = 0; i < 28; i++) {
-            Rectangle slot = controller().zones().getInventorySlots().get(i);
-            BufferedImage slotImg = ScreenManager.captureZone(slot);
-            if (TemplateMatching.match(templatePath, slotImg, MATCH_THRESHOLD).success()) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /** Walks to the given tile using the Dax walker. */
     private void walkTo(Point destination, String label) {
         try {
             controller().walker().pathTo(destination, false);
@@ -408,17 +364,5 @@ public class CooksAssistantScript extends BaseScript {
             logger.error("Walker interrupted going to {}", label);
             stop();
         }
-    }
-
-    /** Presses and releases space to advance dialogue. */
-    private void pressSpace() {
-        controller().keyboard().sendModifierKey(401, "space");
-        waitMillis(HumanBehavior.adjustDelay(80, 120));
-        controller().keyboard().sendModifierKey(402, "space");
-    }
-
-    /** Presses a character key to select a dialogue option. */
-    private void pressKey(char key) {
-        controller().keyboard().sendKeyChar(key);
     }
 }

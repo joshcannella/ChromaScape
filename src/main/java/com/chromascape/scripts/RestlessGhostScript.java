@@ -2,13 +2,13 @@ package com.chromascape.scripts;
 
 import com.chromascape.api.DiscordNotification;
 import com.chromascape.base.BaseScript;
+import com.chromascape.utils.actions.Inventory;
+import com.chromascape.utils.actions.KeyPress;
 import com.chromascape.utils.core.input.distribution.ClickDistribution;
-import com.chromascape.utils.core.screen.topology.TemplateMatching;
 import com.chromascape.utils.core.screen.window.ScreenManager;
 import com.chromascape.scripts.HumanBehavior;
 import java.awt.Point;
 import java.awt.Rectangle;
-import java.awt.image.BufferedImage;
 import java.io.IOException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -90,15 +90,15 @@ public class RestlessGhostScript extends BaseScript {
         walkTo(AERECK_TILE, "Father Aereck");
         clickGameCenter();
         waitMillis(HumanBehavior.adjustDelay(1500, 2500));
-        pressSpace();
+        KeyPress.space(this);
         waitMillis(HumanBehavior.adjustDelay(800, 1200));
-        pressKey('3');
+        KeyPress.character(this, '3');
         waitMillis(HumanBehavior.adjustDelay(1500, 2500));
-        pressKey('1');
+        KeyPress.character(this, '1');
         waitMillis(HumanBehavior.adjustDelay(1500, 2500));
         for (int i = 0; i < 5; i++) {
           checkInterrupted();
-          pressSpace();
+          KeyPress.space(this);
           waitMillis(HumanBehavior.adjustDelay(800, 1200));
         }
         // Don't jump straight to TALK_URHNEY — walk first, then talk separately
@@ -111,7 +111,7 @@ public class RestlessGhostScript extends BaseScript {
         step = Step.TALK_URHNEY;
       }
       case TALK_URHNEY -> {
-        if (!hasItem(AMULET_IMAGE)) {
+        if (!Inventory.hasItem(this, AMULET_IMAGE, MATCH_THRESHOLD)) {
           urhneyAttempts++;
           if (urhneyAttempts > 3) {
             // Aereck dialog likely failed — restart from church
@@ -126,13 +126,13 @@ public class RestlessGhostScript extends BaseScript {
           // Click again to talk to Urhney
           clickGameCenter();
           waitMillis(HumanBehavior.adjustDelay(1500, 2500));
-          pressSpace();
+          KeyPress.space(this);
           waitMillis(HumanBehavior.adjustDelay(800, 1200));
-          pressKey('2');
+          KeyPress.character(this, '2');
           waitMillis(HumanBehavior.adjustDelay(1500, 2500));
           for (int i = 0; i < 6; i++) {
             checkInterrupted();
-            pressSpace();
+            KeyPress.space(this);
             waitMillis(HumanBehavior.adjustDelay(800, 1200));
           }
           // Do NOT advance — let the next cycle's hasItem check confirm we got the amulet.
@@ -142,11 +142,11 @@ public class RestlessGhostScript extends BaseScript {
         }
       }
       case EQUIP_AMULET -> {
-        if (hasItem(AMULET_IMAGE)) {
-          clickInventoryItem(AMULET_IMAGE);
+        if (Inventory.hasItem(this, AMULET_IMAGE, MATCH_THRESHOLD)) {
+          Inventory.clickItem(this, AMULET_IMAGE, MATCH_THRESHOLD, "medium");
           waitMillis(HumanBehavior.adjustDelay(600, 1000));
         }
-        if (!hasItem(AMULET_IMAGE)) {
+        if (!Inventory.hasItem(this, AMULET_IMAGE, MATCH_THRESHOLD)) {
           step = Step.OPEN_COFFIN;
         }
       }
@@ -160,7 +160,7 @@ public class RestlessGhostScript extends BaseScript {
         waitMillis(HumanBehavior.adjustDelay(1500, 2500));
         for (int i = 0; i < 8; i++) {
           checkInterrupted();
-          pressSpace();
+          KeyPress.space(this);
           waitMillis(HumanBehavior.adjustDelay(800, 1200));
         }
         step = Step.WALK_TO_TOWER;
@@ -180,14 +180,14 @@ public class RestlessGhostScript extends BaseScript {
         }
       }
       case GET_SKULL -> {
-        if (!hasItem(SKULL_IMAGE)) {
+        if (!Inventory.hasItem(this, SKULL_IMAGE, MATCH_THRESHOLD)) {
           if (!walkedToAltar) {
             walkTo(ALTAR_TILE, "altar");
             walkedToAltar = true;
           }
           clickGameCenter();
           waitMillis(HumanBehavior.adjustDelay(1500, 2500));
-          pressSpace();
+          KeyPress.space(this);
           waitMillis(HumanBehavior.adjustDelay(800, 1200));
           // Don't advance — let next cycle's hasItem check confirm skull pickup
         } else {
@@ -210,14 +210,14 @@ public class RestlessGhostScript extends BaseScript {
         step = Step.USE_SKULL;
       }
       case USE_SKULL -> {
-        if (hasItem(SKULL_IMAGE)) {
-          clickInventoryItem(SKULL_IMAGE);
+        if (Inventory.hasItem(this, SKULL_IMAGE, MATCH_THRESHOLD)) {
+          Inventory.clickItem(this, SKULL_IMAGE, MATCH_THRESHOLD, "medium");
           waitMillis(HumanBehavior.adjustDelay(300, 500));
           clickGameCenter();
           waitMillis(HumanBehavior.adjustDelay(2000, 3000));
           for (int i = 0; i < 5; i++) {
             checkInterrupted();
-            pressSpace();
+            KeyPress.space(this);
             waitMillis(HumanBehavior.adjustDelay(800, 1200));
           }
           // Don't advance — let next cycle's hasItem check confirm skull is gone
@@ -235,12 +235,12 @@ public class RestlessGhostScript extends BaseScript {
 
   /** Advances past steps whose items are already in inventory. */
   private void skipCompletedSteps() {
-    if (step.ordinal() < Step.EQUIP_AMULET.ordinal() && hasItem(AMULET_IMAGE)) {
+    if (step.ordinal() < Step.EQUIP_AMULET.ordinal() && Inventory.hasItem(this, AMULET_IMAGE, MATCH_THRESHOLD)) {
       step = Step.EQUIP_AMULET;
     }
     if (step.ordinal() >= Step.GET_SKULL.ordinal()
         && step.ordinal() <= Step.ASCEND_TOWER.ordinal()
-        && hasItem(SKULL_IMAGE)) {
+        && Inventory.hasItem(this, SKULL_IMAGE, MATCH_THRESHOLD)) {
       step = Step.RETURN_TO_COFFIN;
     }
   }
@@ -271,32 +271,6 @@ public class RestlessGhostScript extends BaseScript {
     controller().mouse().leftClick();
   }
 
-  private void clickInventoryItem(String templatePath) {
-    for (int i = 0; i < 28; i++) {
-      Rectangle slot = controller().zones().getInventorySlots().get(i);
-      BufferedImage slotImg = ScreenManager.captureZone(slot);
-      if (TemplateMatching.match(templatePath, slotImg, MATCH_THRESHOLD).success()) {
-        Point clickLoc = ClickDistribution.generateRandomPoint(slot);
-        controller().mouse().moveTo(clickLoc, "medium");
-        controller().mouse().leftClick();
-        return;
-      }
-    }
-    logger.error("Item not found in inventory: {}", templatePath);
-    stop();
-  }
-
-  private boolean hasItem(String templatePath) {
-    for (int i = 0; i < 28; i++) {
-      Rectangle slot = controller().zones().getInventorySlots().get(i);
-      BufferedImage slotImg = ScreenManager.captureZone(slot);
-      if (TemplateMatching.match(templatePath, slotImg, MATCH_THRESHOLD).success()) {
-        return true;
-      }
-    }
-    return false;
-  }
-
   private void walkTo(Point destination, String label) {
     try {
       controller().walker().pathTo(destination, false);
@@ -317,15 +291,5 @@ public class RestlessGhostScript extends BaseScript {
     } catch (IOException | InterruptedException e) {
       return false;
     }
-  }
-
-  private void pressSpace() {
-    controller().keyboard().sendModifierKey(401, "space");
-    waitMillis(HumanBehavior.adjustDelay(80, 120));
-    controller().keyboard().sendModifierKey(402, "space");
-  }
-
-  private void pressKey(char key) {
-    controller().keyboard().sendKeyChar(key);
   }
 }

@@ -43,18 +43,12 @@ public class LevelUpDismisser {
     String text = Ocr.extractText(chatZone, "Plain 12", BLACK, true).toLowerCase();
     if (text.contains("congratulations") || text.contains("advanced")) {
       logger.info("Level-up detected, dismissing.");
-      pressSpace(base);
+      KeyPress.space(base);
       // Dismiss twice in case there's a follow-up dialog
       BaseScript.waitRandomMillis(300, 500);
-      pressSpace(base);
+      KeyPress.space(base);
       return true;
     }
     return false;
-  }
-
-  private static void pressSpace(BaseScript base) {
-    base.controller().keyboard().sendModifierKey(401, "space");
-    BaseScript.waitMillis(80);
-    base.controller().keyboard().sendModifierKey(402, "space");
   }
 }

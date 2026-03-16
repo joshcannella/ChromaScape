@@ -3,8 +3,11 @@ package com.chromascape.scripts;
 import com.chromascape.api.DiscordNotification;
 import com.chromascape.base.BaseScript;
 import com.chromascape.utils.actions.Idler;
+import com.chromascape.utils.actions.Inventory;
 import com.chromascape.utils.actions.ItemDropper;
+import com.chromascape.utils.actions.KeyPress;
 import com.chromascape.utils.actions.LevelUpDismisser;
+import com.chromascape.utils.actions.Logout;
 import com.chromascape.utils.core.input.distribution.ClickDistribution;
 import com.chromascape.utils.core.screen.colour.ColourObj;
 import com.chromascape.utils.core.screen.topology.ChromaObj;
@@ -126,7 +129,7 @@ public class DraynorFishCookScript extends BaseScript {
     if (stuckCounter >= MAX_STUCK_CYCLES) {
       logger.error("Stuck for {} cycles, logging out.", MAX_STUCK_CYCLES);
       DiscordNotification.send("DraynorFishCook: stuck, logging out.");
-      pressLogout();
+      Logout.perform(this);
       stop();
       return;
     }
@@ -246,7 +249,7 @@ public class DraynorFishCookScript extends BaseScript {
     int rawBefore = rawCount;
     Idler.waitUntilIdle(this, 120);
 
-    if (countItem(RAW_SHRIMP) > rawBefore) {
+    if (Inventory.countItem(this, RAW_SHRIMP, INV_THRESHOLD) > rawBefore) {
       stuckCounter = 0;
     } else {
       stuckCounter++;
@@ -256,7 +259,7 @@ public class DraynorFishCookScript extends BaseScript {
   // ======================== CHOP ========================
 
   private void chop() {
-    if (hasLogs) {
+    if (Inventory.hasItem(this, LOGS, INV_THRESHOLD)) {
       stuckCounter = 0;
       return;
     }
@@ -284,7 +287,7 @@ public class DraynorFishCookScript extends BaseScript {
 
     Idler.waitUntilIdle(this, 15);
 
-    if (hasItem(LOGS)) {
+    if (Inventory.hasItem(this, LOGS, INV_THRESHOLD)) {
       stuckCounter = 0;
     } else {
       stuckCounter++;
@@ -294,7 +297,7 @@ public class DraynorFishCookScript extends BaseScript {
   // ======================== LIGHT FIRE ========================
 
   private void lightFire() {
-    if (!hasItem(LOGS)) {
+    if (!Inventory.hasItem(this, LOGS, INV_THRESHOLD)) {
       stuckCounter++;
       return;
     }
@@ -304,9 +307,9 @@ public class DraynorFishCookScript extends BaseScript {
       return;
     }
 
-    clickInventoryItem(TINDERBOX);
+    Inventory.clickItem(this, TINDERBOX, INV_THRESHOLD, "medium");
     waitMillis(HumanBehavior.adjustDelay(200, 400));
-    clickInventoryItem(LOGS);
+    Inventory.clickItem(this, LOGS, INV_THRESHOLD, "medium");
     waitMillis(HumanBehavior.adjustDelay(3000, 5000));
 
     // Wait for fire to appear
@@ -328,7 +331,7 @@ public class DraynorFishCookScript extends BaseScript {
   // ======================== COOK ========================
 
   private void cook() {
-    if (!hasItem(RAW_SHRIMP)) {
+    if (!Inventory.hasItem(this, RAW_SHRIMP, INV_THRESHOLD)) {
       stuckCounter = 0;
       return;
     }
@@ -340,7 +343,7 @@ public class DraynorFishCookScript extends BaseScript {
     }
 
     // Use raw shrimp on fire
-    clickInventoryItem(RAW_SHRIMP);
+    Inventory.clickItem(this, RAW_SHRIMP, INV_THRESHOLD, "medium");
     waitMillis(HumanBehavior.adjustDelay(200, 400));
 
     Point fireLoc = getColourClickPoint(FIRE_COLOUR);
@@ -354,7 +357,7 @@ public class DraynorFishCookScript extends BaseScript {
 
     // Wait for cook dialog then press space
     waitMillis(HumanBehavior.adjustDelay(1500, 2500));
-    pressSpace();
+    KeyPress.space(this);
 
     // Wait for full cook — Idler handles the blocking
     Idler.waitUntilIdle(this, 90);
@@ -364,8 +367,8 @@ public class DraynorFishCookScript extends BaseScript {
   // ======================== DROP ========================
 
   private void drop() {
-    int tinderboxSlot = findItemSlot(TINDERBOX);
-    int netSlot = findItemSlot(NET);
+    int tinderboxSlot = Inventory.findItemSlot(this, TINDERBOX, INV_THRESHOLD);
+    int netSlot = Inventory.findItemSlot(this, NET, INV_THRESHOLD);
 
     int[] exclude;
     if (tinderboxSlot >= 0 && netSlot >= 0) {
@@ -384,56 +387,9 @@ public class DraynorFishCookScript extends BaseScript {
     logger.info("Dropped all fish.");
   }
 
-  // ======================== INVENTORY UTILITIES ========================
+  // ======================== COLOUR UTILITIES ========================
 
-  private boolean hasItem(String templatePath) {
-    for (int i = 0; i < 28; i++) {
-      Rectangle slot = controller().zones().getInventorySlots().get(i);
-      BufferedImage slotImg = ScreenManager.captureZone(slot);
-      if (TemplateMatching.match(templatePath, slotImg, INV_THRESHOLD).success()) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  private int countItem(String templatePath) {
-    int count = 0;
-    for (int i = 0; i < 28; i++) {
-      Rectangle slot = controller().zones().getInventorySlots().get(i);
-      BufferedImage slotImg = ScreenManager.captureZone(slot);
-      if (TemplateMatching.match(templatePath, slotImg, INV_THRESHOLD).success()) {
-        count++;
-      }
-    }
-    return count;
-  }
-
-  private int findItemSlot(String templatePath) {
-    for (int i = 0; i < 28; i++) {
-      Rectangle slot = controller().zones().getInventorySlots().get(i);
-      BufferedImage slotImg = ScreenManager.captureZone(slot);
-      if (TemplateMatching.match(templatePath, slotImg, INV_THRESHOLD).success()) {
-        return i;
-      }
-    }
-    return -1;
-  }
-
-  private void clickInventoryItem(String templatePath) {
-    for (int i = 0; i < 28; i++) {
-      Rectangle slot = controller().zones().getInventorySlots().get(i);
-      BufferedImage slotImg = ScreenManager.captureZone(slot);
-      if (TemplateMatching.match(templatePath, slotImg, INV_THRESHOLD).success()) {
-        Point clickLoc = ClickDistribution.generateRandomPoint(slot);
-        controller().mouse().moveTo(clickLoc, "medium");
-        controller().mouse().leftClick();
-        return;
-      }
-    }
-    logger.warn("Item not found in inventory: {}", templatePath);
-  }
-
+  /** Shift-click drops one cooked or burnt shrimp to free an inventory slot. */
   private void dropOneCooked() {
     for (int i = 0; i < 28; i++) {
       Rectangle slot = controller().zones().getInventorySlots().get(i);
@@ -452,7 +408,7 @@ public class DraynorFishCookScript extends BaseScript {
     }
   }
 
-  // ======================== COLOUR UTILITIES ========================
+  // ======================== COLOUR DETECTION ========================
 
   /** Checks colour visibility. Always releases ChromaObj Mats. */
   private boolean isColourVisible(ColourObj colour) {
@@ -504,26 +460,4 @@ public class DraynorFishCookScript extends BaseScript {
     }
   }
 
-  // ======================== INPUT HELPERS ========================
-
-  private void pressSpace() {
-    controller().keyboard().sendModifierKey(401, "space");
-    waitMillis(HumanBehavior.adjustDelay(80, 120));
-    controller().keyboard().sendModifierKey(402, "space");
-  }
-
-  private void pressLogout() {
-    // Click the logout tab to switch the panel
-    Rectangle logoutTab = controller().zones().getCtrlPanel().get("logoutTab");
-    controller().mouse().moveTo(ClickDistribution.generateRandomPoint(logoutTab), "medium");
-    controller().mouse().leftClick();
-    waitMillis(HumanBehavior.adjustDelay(400, 600));
-    // The logout button is roughly centered in the upper portion of the panel
-    Rectangle panel = controller().zones().getCtrlPanel().get("inventoryPanel");
-    int btnX = panel.x + panel.width / 2 - 40;
-    int btnY = panel.y + panel.height / 2 - 20;
-    Rectangle logoutBtn = new Rectangle(btnX, btnY, 80, 30);
-    controller().mouse().moveTo(ClickDistribution.generateRandomPoint(logoutBtn), "medium");
-    controller().mouse().leftClick();
-  }
 }
