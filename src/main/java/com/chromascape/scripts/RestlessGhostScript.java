@@ -69,23 +69,23 @@ public class RestlessGhostScript extends BaseScript {
       case ENTER_CHURCH -> {
         Walk.toOrStop(this, CHURCH_DOOR_TILE, "church door");
         clickGameCenter();
-        waitMillis(HumanBehavior.adjustDelay(1500, 2500));
+        HumanBehavior.sleep(1500, 2500);
         step = Step.TALK_AERECK;
       }
       case TALK_AERECK -> {
         Walk.toOrStop(this, AERECK_TILE, "Father Aereck");
         clickGameCenter();
-        waitMillis(HumanBehavior.adjustDelay(1500, 2500));
+        HumanBehavior.sleep(1500, 2500);
         KeyPress.space(this);
-        waitMillis(HumanBehavior.adjustDelay(800, 1200));
+        HumanBehavior.sleep(800, 1200);
         KeyPress.character(this, '3');
-        waitMillis(HumanBehavior.adjustDelay(1500, 2500));
+        HumanBehavior.sleep(1500, 2500);
         KeyPress.character(this, '1');
-        waitMillis(HumanBehavior.adjustDelay(1500, 2500));
+        HumanBehavior.sleep(1500, 2500);
         for (int i = 0; i < 5; i++) {
           checkInterrupted();
           KeyPress.space(this);
-          waitMillis(HumanBehavior.adjustDelay(800, 1200));
+          HumanBehavior.sleep(800, 1200);
         }
         // Don't jump straight to TALK_URHNEY — walk first, then talk separately
         step = Step.WALK_TO_URHNEY;
@@ -108,18 +108,18 @@ public class RestlessGhostScript extends BaseScript {
           }
           // Click to open door (or talk if already open)
           clickGameCenter();
-          waitMillis(HumanBehavior.adjustDelay(1500, 2500));
+          HumanBehavior.sleep(1500, 2500);
           // Click again to talk to Urhney
           clickGameCenter();
-          waitMillis(HumanBehavior.adjustDelay(1500, 2500));
+          HumanBehavior.sleep(1500, 2500);
           KeyPress.space(this);
-          waitMillis(HumanBehavior.adjustDelay(800, 1200));
+          HumanBehavior.sleep(800, 1200);
           KeyPress.character(this, '2');
-          waitMillis(HumanBehavior.adjustDelay(1500, 2500));
+          HumanBehavior.sleep(1500, 2500);
           for (int i = 0; i < 6; i++) {
             checkInterrupted();
             KeyPress.space(this);
-            waitMillis(HumanBehavior.adjustDelay(800, 1200));
+            HumanBehavior.sleep(800, 1200);
           }
           // Do NOT advance — let the next cycle's hasItem check confirm we got the amulet.
         } else {
@@ -130,7 +130,7 @@ public class RestlessGhostScript extends BaseScript {
       case EQUIP_AMULET -> {
         if (Inventory.hasItem(this, AMULET_IMAGE, MATCH_THRESHOLD)) {
           Inventory.clickItem(this, AMULET_IMAGE, MATCH_THRESHOLD, "medium");
-          waitMillis(HumanBehavior.adjustDelay(600, 1000));
+          HumanBehavior.sleep(600, 1000);
         }
         if (!Inventory.hasItem(this, AMULET_IMAGE, MATCH_THRESHOLD)) {
           step = Step.OPEN_COFFIN;
@@ -140,14 +140,14 @@ public class RestlessGhostScript extends BaseScript {
         Walk.toOrStop(this, COFFIN_TILE, "coffin");
         // Open the coffin
         clickGameCenter();
-        waitMillis(HumanBehavior.adjustDelay(2500, 3500));
+        HumanBehavior.sleep(2500, 3500);
         // Talk to the ghost that appears
         clickGameCenter();
-        waitMillis(HumanBehavior.adjustDelay(1500, 2500));
+        HumanBehavior.sleep(1500, 2500);
         for (int i = 0; i < 8; i++) {
           checkInterrupted();
           KeyPress.space(this);
-          waitMillis(HumanBehavior.adjustDelay(800, 1200));
+          HumanBehavior.sleep(800, 1200);
         }
         step = Step.WALK_TO_TOWER;
       }
@@ -157,7 +157,7 @@ public class RestlessGhostScript extends BaseScript {
       }
       case DESCEND_TOWER -> {
         clickGameCenter();
-        waitMillis(HumanBehavior.adjustDelay(2500, 3500));
+        HumanBehavior.sleep(2500, 3500);
         // Verify we actually descended by checking if walker can reach the basement altar
         if (canWalkTo(ALTAR_TILE)) {
           step = Step.GET_SKULL;
@@ -172,9 +172,9 @@ public class RestlessGhostScript extends BaseScript {
             walkedToAltar = true;
           }
           clickGameCenter();
-          waitMillis(HumanBehavior.adjustDelay(1500, 2500));
+          HumanBehavior.sleep(1500, 2500);
           KeyPress.space(this);
-          waitMillis(HumanBehavior.adjustDelay(800, 1200));
+          HumanBehavior.sleep(800, 1200);
           // Don't advance — let next cycle's hasItem check confirm skull pickup
         } else {
           walkedToAltar = false;
@@ -183,7 +183,7 @@ public class RestlessGhostScript extends BaseScript {
       }
       case ASCEND_TOWER -> {
         clickGameCenter();
-        waitMillis(HumanBehavior.adjustDelay(2500, 3500));
+        HumanBehavior.sleep(2500, 3500);
         // Verify we actually ascended by checking if walker can reach the coffin
         if (canWalkTo(COFFIN_TILE)) {
           step = Step.RETURN_TO_COFFIN;
@@ -198,13 +198,13 @@ public class RestlessGhostScript extends BaseScript {
       case USE_SKULL -> {
         if (Inventory.hasItem(this, SKULL_IMAGE, MATCH_THRESHOLD)) {
           Inventory.clickItem(this, SKULL_IMAGE, MATCH_THRESHOLD, "medium");
-          waitMillis(HumanBehavior.adjustDelay(300, 500));
+          HumanBehavior.sleep(300, 500);
           clickGameCenter();
-          waitMillis(HumanBehavior.adjustDelay(2000, 3000));
+          HumanBehavior.sleep(2000, 3000);
           for (int i = 0; i < 5; i++) {
             checkInterrupted();
             KeyPress.space(this);
-            waitMillis(HumanBehavior.adjustDelay(800, 1200));
+            HumanBehavior.sleep(800, 1200);
           }
           // Don't advance — let next cycle's hasItem check confirm skull is gone
         } else {

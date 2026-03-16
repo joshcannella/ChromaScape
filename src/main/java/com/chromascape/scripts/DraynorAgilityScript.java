@@ -78,7 +78,7 @@ public class DraynorAgilityScript extends BaseScript {
 
         MovingObject.clickMovingObjectByColourObjUntilRedClick(OBSTACLE_COLOUR, this);
         waitUntilXpChange(previousXp);
-        waitMillis(HumanBehavior.adjustDelay(650, 800));
+        HumanBehavior.sleep(650, 800);
     }
 
     /**
@@ -86,7 +86,7 @@ public class DraynorAgilityScript extends BaseScript {
      * Double-checks visibility after a short wait to guard against rendering lag.
      */
     private void recoverToResetTile() {
-        waitMillis(HumanBehavior.adjustDelay(600, 800));
+        HumanBehavior.sleep(600, 800);
         if (isObstacleVisible()) {
             return;
         }

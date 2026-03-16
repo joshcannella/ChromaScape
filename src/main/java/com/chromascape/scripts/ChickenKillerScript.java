@@ -142,14 +142,14 @@ public class ChickenKillerScript extends BaseScript {
         int delta = Minimap.getXp(this) - previousXp;
         if (delta >= CHICKEN_XP && delta < 100) {
           logger.info("Kill confirmed via XP (+{})", delta);
-          waitMillis(HumanBehavior.adjustDelay(600, 900));
+          HumanBehavior.sleep(600, 900);
           if (LOOT_FEATHERS) {
             Point lootLoc = findNearestLoot();
             if (lootLoc != null) {
               controller().mouse().moveTo(lootLoc, "fast");
               controller().mouse().leftClick();
               logger.info("Clicked feather loot at {}", lootLoc);
-              waitMillis(HumanBehavior.adjustDelay(300, 500));
+              HumanBehavior.sleep(300, 500);
             }
           }
           checkStyleRotation();
@@ -189,17 +189,17 @@ public class ChickenKillerScript extends BaseScript {
       // Walk to gate, click it to open if closed, then walk inside
       logger.info("Walking to coop gate");
       controller().walker().pathTo(COOP_GATE, false);
-      waitMillis(HumanBehavior.adjustDelay(1000, 1500));
+      HumanBehavior.sleep(1000, 1500);
       // Click center to interact with gate
       BufferedImage gameView = controller().zones().getGameView();
       Point center = new Point(gameView.getWidth() / 2, gameView.getHeight() / 2);
       controller().mouse().moveTo(center, "medium");
       controller().mouse().leftClick();
-      waitMillis(HumanBehavior.adjustDelay(1500, 2500));
+      HumanBehavior.sleep(1500, 2500);
       // Walk inside the coop
       logger.info("Walking into coop");
       controller().walker().pathTo(COOP_CENTER, false);
-      waitMillis(HumanBehavior.adjustDelay(2000, 3000));
+      HumanBehavior.sleep(2000, 3000);
     } catch (InterruptedException e) {
       logger.error("Walker interrupted");
       stop();
@@ -241,7 +241,7 @@ public class ChickenKillerScript extends BaseScript {
     Rectangle combatTab = controller().zones().getCtrlPanel().get("combatTab");
     controller().mouse().moveTo(ClickDistribution.generateRandomPoint(combatTab), "medium");
     controller().mouse().leftClick();
-    waitMillis(HumanBehavior.adjustDelay(400, 600));
+    HumanBehavior.sleep(400, 600);
 
     Rectangle panel = controller().zones().getCtrlPanel().get("inventoryPanel");
     Rectangle styleBox = switch (style) {
@@ -254,12 +254,12 @@ public class ChickenKillerScript extends BaseScript {
 
     controller().mouse().moveTo(ClickDistribution.generateRandomPoint(styleBox), "medium");
     controller().mouse().leftClick();
-    waitMillis(HumanBehavior.adjustDelay(300, 500));
+    HumanBehavior.sleep(300, 500);
 
     Rectangle invTab = controller().zones().getCtrlPanel().get("inventoryTab");
     controller().mouse().moveTo(ClickDistribution.generateRandomPoint(invTab), "medium");
     controller().mouse().leftClick();
-    waitMillis(HumanBehavior.adjustDelay(200, 400));
+    HumanBehavior.sleep(200, 400);
 
     logger.info("Switched to {} style", style);
   }

@@ -292,9 +292,9 @@ public class DraynorFishCookScript extends BaseScript {
     }
 
     Inventory.clickItem(this, TINDERBOX, INV_THRESHOLD, "medium");
-    waitMillis(HumanBehavior.adjustDelay(200, 400));
+    HumanBehavior.sleep(200, 400);
     Inventory.clickItem(this, LOGS, INV_THRESHOLD, "medium");
-    waitMillis(HumanBehavior.adjustDelay(3000, 5000));
+    HumanBehavior.sleep(3000, 5000);
 
     // Wait for fire to appear
     LocalDateTime deadline = LocalDateTime.now().plusSeconds(FIRE_TIMEOUT_SECONDS);
@@ -328,7 +328,7 @@ public class DraynorFishCookScript extends BaseScript {
 
     // Use raw shrimp on fire
     Inventory.clickItem(this, RAW_SHRIMP, INV_THRESHOLD, "medium");
-    waitMillis(HumanBehavior.adjustDelay(200, 400));
+    HumanBehavior.sleep(200, 400);
 
     Point fireLoc = ColourClick.getClickPoint(this, FIRE_COLOUR);
     if (fireLoc == null) {
@@ -340,7 +340,7 @@ public class DraynorFishCookScript extends BaseScript {
     controller().mouse().leftClick();
 
     // Wait for cook dialog then press space
-    waitMillis(HumanBehavior.adjustDelay(1500, 2500));
+    HumanBehavior.sleep(1500, 2500);
     KeyPress.space(this);
 
     // Wait for full cook — Idler handles the blocking
@@ -366,7 +366,7 @@ public class DraynorFishCookScript extends BaseScript {
     }
 
     ItemDropper.dropAll(this, ItemDropper.DropPattern.ZIGZAG, exclude);
-    waitMillis(HumanBehavior.adjustDelay(300, 500));
+    HumanBehavior.sleep(300, 500);
     stuckCounter = 0;
     logger.info("Dropped all fish.");
   }

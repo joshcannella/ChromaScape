@@ -119,10 +119,10 @@ public class CooksAssistantScript extends BaseScript {
                     if (potLoc != null) {
                         controller().mouse().moveTo(potLoc, "medium");
                         controller().mouse().leftClick();
-                        waitMillis(HumanBehavior.adjustDelay(1200, 1800));
+                        HumanBehavior.sleep(1200, 1800);
                     } else {
                         logger.warn("Pot not found in game view, retrying...");
-                        waitMillis(HumanBehavior.adjustDelay(500, 1000));
+                        HumanBehavior.sleep(500, 1000);
                     }
                 } else {
                     step = Step.GO_TO_CELLAR;
@@ -132,7 +132,7 @@ public class CooksAssistantScript extends BaseScript {
                 // Click trapdoor to enter cellar
                 Walk.toOrStop(this, TRAPDOOR_TILE, "trapdoor");
                 clickGameCenter();
-                waitMillis(HumanBehavior.adjustDelay(2500, 3500));
+                HumanBehavior.sleep(2500, 3500);
                 step = Step.GET_BUCKET;
             }
             case GET_BUCKET -> {
@@ -142,10 +142,10 @@ public class CooksAssistantScript extends BaseScript {
                     if (bucketLoc != null) {
                         controller().mouse().moveTo(bucketLoc, "medium");
                         controller().mouse().leftClick();
-                        waitMillis(HumanBehavior.adjustDelay(1200, 1800));
+                        HumanBehavior.sleep(1200, 1800);
                     } else {
                         logger.warn("Bucket not found in game view, retrying...");
-                        waitMillis(HumanBehavior.adjustDelay(500, 1000));
+                        HumanBehavior.sleep(500, 1000);
                     }
                 } else {
                     step = Step.LEAVE_CELLAR;
@@ -155,7 +155,7 @@ public class CooksAssistantScript extends BaseScript {
                 // Climb ladder up from cellar
                 Walk.toOrStop(this, CELLAR_LADDER_TILE, "ladder");
                 clickGameCenter();
-                waitMillis(HumanBehavior.adjustDelay(2500, 3500));
+                HumanBehavior.sleep(2500, 3500);
                 step = Step.GET_EGG;
             }
             case GET_EGG -> {
@@ -171,7 +171,7 @@ public class CooksAssistantScript extends BaseScript {
                         controller().mouse().moveTo(eggLoc, "medium");
                         controller().mouse().leftClick();
                     }
-                    waitMillis(HumanBehavior.adjustDelay(1200, 1800));
+                    HumanBehavior.sleep(1200, 1800);
                 } else {
                     step = Step.GET_MILK;
                 }
@@ -180,9 +180,9 @@ public class CooksAssistantScript extends BaseScript {
                 if (!Inventory.hasItem(this, MILK_IMAGE, MATCH_THRESHOLD)) {
                     Walk.toOrStop(this, DAIRY_COW_TILE, "dairy cow");
                     Inventory.clickItem(this, BUCKET_IMAGE, MATCH_THRESHOLD, "medium");
-                    waitMillis(HumanBehavior.adjustDelay(300, 500));
+                    HumanBehavior.sleep(300, 500);
                     clickGameCenter();
-                    waitMillis(HumanBehavior.adjustDelay(3000, 4000));
+                    HumanBehavior.sleep(3000, 4000);
                 } else {
                     step = Step.GET_GRAIN;
                 }
@@ -191,7 +191,7 @@ public class CooksAssistantScript extends BaseScript {
                 if (!Inventory.hasItem(this, GRAIN_IMAGE, MATCH_THRESHOLD)) {
                     Walk.toOrStop(this, WHEAT_TILE, "wheat");
                     clickGameCenter(); // Wheat is tall and visible at center
-                    waitMillis(HumanBehavior.adjustDelay(1200, 1800));
+                    HumanBehavior.sleep(1200, 1800);
                 } else {
                     step = Step.MILL_CLIMB_UP;
                 }
@@ -200,40 +200,40 @@ public class CooksAssistantScript extends BaseScript {
                 Walk.toOrStop(this, MILL_GROUND_TILE, "mill");
                 // Climb two flights of stairs
                 clickGameCenter();
-                waitMillis(HumanBehavior.adjustDelay(2000, 3000));
+                HumanBehavior.sleep(2000, 3000);
                 clickGameCenter();
-                waitMillis(HumanBehavior.adjustDelay(2000, 3000));
+                HumanBehavior.sleep(2000, 3000);
                 step = Step.MILL_USE_HOPPER;
             }
             case MILL_USE_HOPPER -> {
                 if (Inventory.hasItem(this, GRAIN_IMAGE, MATCH_THRESHOLD)) {
                     Inventory.clickItem(this, GRAIN_IMAGE, MATCH_THRESHOLD, "medium");
-                    waitMillis(HumanBehavior.adjustDelay(300, 500));
+                    HumanBehavior.sleep(300, 500);
                     clickGameCenter();
-                    waitMillis(HumanBehavior.adjustDelay(1500, 2500));
+                    HumanBehavior.sleep(1500, 2500);
                 } else {
                     step = Step.MILL_PULL_LEVER;
                 }
             }
             case MILL_PULL_LEVER -> {
                 clickGameCenter();
-                waitMillis(HumanBehavior.adjustDelay(1500, 2500));
+                HumanBehavior.sleep(1500, 2500);
                 step = Step.MILL_CLIMB_DOWN;
             }
             case MILL_CLIMB_DOWN -> {
                 // Climb down two flights
                 clickGameCenter();
-                waitMillis(HumanBehavior.adjustDelay(2000, 3000));
+                HumanBehavior.sleep(2000, 3000);
                 clickGameCenter();
-                waitMillis(HumanBehavior.adjustDelay(2000, 3000));
+                HumanBehavior.sleep(2000, 3000);
                 step = Step.MILL_GET_FLOUR;
             }
             case MILL_GET_FLOUR -> {
                 if (!Inventory.hasItem(this, FLOUR_IMAGE, MATCH_THRESHOLD)) {
                     Inventory.clickItem(this, POT_IMAGE, MATCH_THRESHOLD, "medium");
-                    waitMillis(HumanBehavior.adjustDelay(300, 500));
+                    HumanBehavior.sleep(300, 500);
                     clickGameCenter();
-                    waitMillis(HumanBehavior.adjustDelay(1500, 2500));
+                    HumanBehavior.sleep(1500, 2500);
                 } else {
                     step = Step.DELIVER;
                 }
@@ -241,17 +241,17 @@ public class CooksAssistantScript extends BaseScript {
             case DELIVER -> {
                 Walk.toOrStop(this, COOK_TILE, "cook");
                 clickGameCenter();
-                waitMillis(HumanBehavior.adjustDelay(1500, 2500));
+                HumanBehavior.sleep(1500, 2500);
                 // Dialogue: "What's wrong?" → 1, "Can I help?" → 1
                 KeyPress.character(this, '1');
-                waitMillis(HumanBehavior.adjustDelay(1500, 2500));
+                HumanBehavior.sleep(1500, 2500);
                 KeyPress.character(this, '1');
-                waitMillis(HumanBehavior.adjustDelay(1500, 2500));
+                HumanBehavior.sleep(1500, 2500);
                 // Continue through remaining dialogue
                 for (int i = 0; i < 8; i++) {
                     checkInterrupted();
                     KeyPress.space(this);
-                    waitMillis(HumanBehavior.adjustDelay(800, 1200));
+                    HumanBehavior.sleep(800, 1200);
                 }
                 step = Step.DONE;
             }

@@ -66,7 +66,7 @@ public class AlKharidIronMiningScript extends BaseScript {
         }
 
         clickRock();
-        waitMillis(HumanBehavior.adjustDelay(800, 1000));
+        HumanBehavior.sleep(800, 1000);
         Idler.waitUntilIdle(this, IDLE_TIMEOUT);
     }
 
@@ -76,12 +76,12 @@ public class AlKharidIronMiningScript extends BaseScript {
      */
     private void bankOre() {
         Walk.toOrStop(this, BANK_TILE, "bank");
-        waitMillis(HumanBehavior.adjustDelay(600, 900));
+        HumanBehavior.sleep(600, 900);
         Bank.open(this, BANK_COLOUR);
         Bank.depositAll(this);
         Bank.close(this);
         Walk.toOrStop(this, MINE_TILE, "mine");
-        waitMillis(HumanBehavior.adjustDelay(600, 900));
+        HumanBehavior.sleep(600, 900);
     }
 
     /**

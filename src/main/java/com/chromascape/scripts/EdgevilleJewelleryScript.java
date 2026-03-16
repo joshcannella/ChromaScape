@@ -113,10 +113,10 @@ public class EdgevilleJewelleryScript extends BaseScript {
         if (!hasMaterials()) {
             logger.info("No materials, banking");
             Walk.toOrStop(this, BANK_TILE, "bank");
-            waitMillis(HumanBehavior.adjustDelay(600, 900));
+            HumanBehavior.sleep(600, 900);
             bank();
             Walk.toOrStop(this, FURNACE_TILE, "furnace");
-            waitMillis(HumanBehavior.adjustDelay(600, 900));
+            HumanBehavior.sleep(600, 900);
         }
 
         smelt();
@@ -134,18 +134,18 @@ public class EdgevilleJewelleryScript extends BaseScript {
         Point slotLoc = ClickDistribution.generateRandomPoint(slot1);
         controller().mouse().moveTo(slotLoc, "medium");
         controller().mouse().rightClick();
-        waitMillis(HumanBehavior.adjustDelay(400, 600));
+        HumanBehavior.sleep(400, 600);
         controller().mouse().moveTo(new Point(slotLoc.x, slotLoc.y + 85), "fast");
         controller().mouse().leftClick();
-        waitMillis(HumanBehavior.adjustDelay(300, 500));
+        HumanBehavior.sleep(300, 500);
 
         // Withdraw 13 gold bars — click gold bar in bank
         withdrawItem(GOLD_BAR_IMAGE);
-        waitMillis(HumanBehavior.adjustDelay(300, 500));
+        HumanBehavior.sleep(300, 500);
 
         // Withdraw 13 gems — click gem in bank
         withdrawItem(gem.image);
-        waitMillis(HumanBehavior.adjustDelay(300, 500));
+        HumanBehavior.sleep(300, 500);
 
         Bank.close(this);
     }
@@ -182,13 +182,13 @@ public class EdgevilleJewelleryScript extends BaseScript {
         }
 
         HumanBehavior.click(this, furnaceLoc);
-        waitMillis(HumanBehavior.adjustDelay(2500, 3500));
+        HumanBehavior.sleep(2500, 3500);
 
         // Press Space to confirm the default selection (makes all)
         KeyPress.space(this);
 
         // Wait for batch to complete: 13 items × 3 ticks × 600ms = ~23.4s
-        waitMillis(HumanBehavior.adjustDelay(24000, 26000));
+        HumanBehavior.sleep(24000, 26000);
         Idler.waitUntilIdle(this, 10);
     }
 

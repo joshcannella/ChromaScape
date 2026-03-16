@@ -128,6 +128,14 @@ public final class HumanBehavior {
   // ========== Humanized Click ==========
 
   /**
+   * Waits for a human-adjusted random duration between min and max milliseconds.
+   * Convenience wrapper for {@code waitMillis(adjustDelay(min, max))}.
+   */
+  public static void sleep(long min, long max) {
+    BaseScript.waitMillis(adjustDelay(min, max));
+  }
+
+  /**
    * Performs a human-like left click at the given point: random speed, optional hesitation,
    * optional misclick (with correction), micro-jitter, then click.
    *
