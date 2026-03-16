@@ -181,15 +181,7 @@ public class EdgevilleJewelleryScript extends BaseScript {
             return;
         }
 
-        String speed = HumanBehavior.shouldSlowApproach() ? "slow" : "medium";
-        controller().mouse().moveTo(furnaceLoc, speed);
-
-        if (HumanBehavior.shouldHesitate()) {
-            HumanBehavior.performHesitation();
-        }
-
-        controller().mouse().microJitter();
-        controller().mouse().leftClick();
+        HumanBehavior.click(this, furnaceLoc);
         waitMillis(HumanBehavior.adjustDelay(2500, 3500));
 
         // Press Space to confirm the default selection (makes all)

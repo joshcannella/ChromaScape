@@ -305,19 +305,7 @@ public class CooksAssistantScript extends BaseScript {
                 regionSize, regionSize);
         Point clickLoc = ClickDistribution.generateRandomPoint(centerRegion);
 
-        String speed = HumanBehavior.shouldSlowApproach() ? "slow" : "medium";
-        controller().mouse().moveTo(clickLoc, speed);
-
-        if (HumanBehavior.shouldHesitate()) {
-            HumanBehavior.performHesitation();
-        }
-        if (HumanBehavior.shouldMisclick()) {
-            HumanBehavior.performMisclick(this, clickLoc);
-            controller().mouse().moveTo(clickLoc, "medium");
-        }
-
-        controller().mouse().microJitter();
-        controller().mouse().leftClick();
+        HumanBehavior.click(this, clickLoc);
     }
 
     /**

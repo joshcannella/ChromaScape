@@ -125,6 +125,32 @@ public final class HumanBehavior {
     return roll(CAMERA_FIDGET_RATE);
   }
 
+  // ========== Humanized Click ==========
+
+  /**
+   * Performs a human-like left click at the given point: random speed, optional hesitation,
+   * optional misclick (with correction), micro-jitter, then click.
+   *
+   * @param script the active script instance
+   * @param target the intended click point
+   */
+  public static void click(BaseScript script, Point target) {
+    BaseScript.checkInterrupted();
+    String speed = shouldSlowApproach() ? "slow" : "medium";
+    script.controller().mouse().moveTo(target, speed);
+
+    if (shouldHesitate()) {
+      performHesitation();
+    }
+    if (shouldMisclick()) {
+      performMisclick(script, target);
+      script.controller().mouse().moveTo(target, "medium");
+    }
+
+    script.controller().mouse().microJitter();
+    script.controller().mouse().leftClick();
+  }
+
   // ========== Action Methods ==========
 
   public static void performMisclick(BaseScript script, Point intended) {
