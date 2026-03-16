@@ -1,7 +1,9 @@
 package com.chromascape.utils.actions.custom;
 
 import com.chromascape.base.BaseScript;
+import java.awt.MouseInfo;
 import java.awt.Point;
+import java.awt.PointerInfo;
 import java.util.concurrent.ThreadLocalRandom;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -44,12 +46,12 @@ public final class HumanBehavior {
 
   // === Session State ===
 
-  private static final long SESSION_START = System.currentTimeMillis();
+  private static long sessionStart = System.currentTimeMillis();
   private static double tempoMultiplier;
   private static long nextTempoDriftTime;
-  private static final long BREAK_WARMUP_MS =
+  private static long breakWarmupMs =
       ThreadLocalRandom.current().nextLong(20L * 60 * 1000, 30L * 60 * 1000 + 1);
-  private static long lastExtendedBreakTime = SESSION_START;
+  private static long lastExtendedBreakTime = sessionStart;
 
   static {
     tempoMultiplier = 0.85 + ThreadLocalRandom.current().nextDouble(0.30);
@@ -57,6 +59,19 @@ public final class HumanBehavior {
   }
 
   private HumanBehavior() {}
+
+  /**
+   * Resets all session state (fatigue, tempo, break timers). Call when starting a new script
+   * to avoid carrying over state from a previous run in the same JVM.
+   */
+  public static void reset() {
+    sessionStart = System.currentTimeMillis();
+    lastExtendedBreakTime = sessionStart;
+    tempoMultiplier = 0.85 + ThreadLocalRandom.current().nextDouble(0.30);
+    breakWarmupMs = ThreadLocalRandom.current().nextLong(20L * 60 * 1000, 30L * 60 * 1000 + 1);
+    scheduleNextTempoDrift();
+    logger.info("HumanBehavior session state reset");
+  }
 
   // ========== Pre-Cycle Boilerplate ==========
 
@@ -112,12 +127,12 @@ public final class HumanBehavior {
   }
 
   public static boolean shouldTakeBreak() {
-    if (System.currentTimeMillis() - SESSION_START < BREAK_WARMUP_MS) return false;
+    if (System.currentTimeMillis() - sessionStart < breakWarmupMs) return false;
     return roll(BREAK_RATE);
   }
 
   public static boolean shouldTakeExtendedBreak() {
-    if (System.currentTimeMillis() - SESSION_START < BREAK_WARMUP_MS) return false;
+    if (System.currentTimeMillis() - sessionStart < breakWarmupMs) return false;
     return roll(EXTENDED_BREAK_RATE);
   }
 
@@ -212,10 +227,14 @@ public final class HumanBehavior {
     int dragX = ThreadLocalRandom.current().nextInt(-40, 41);
     int dragY = ThreadLocalRandom.current().nextInt(-15, 16);
     logger.debug("Camera fidget dx={} dy={}", dragX, dragY);
+
+    PointerInfo pi = MouseInfo.getPointerInfo();
+    Point anchor = (pi != null) ? pi.getLocation() : new Point(400, 300);
+
     script.controller().mouse().middleClick(501);
     BaseScript.waitRandomMillis(50, 120);
-    Point current = new Point(400 + dragX, 300 + dragY);
-    script.controller().mouse().moveTo(current, "fast");
+    script.controller().mouse().moveTo(
+        new Point(anchor.x + dragX, anchor.y + dragY), "fast");
     BaseScript.waitRandomMillis(50, 100);
     script.controller().mouse().middleClick(502);
   }
@@ -251,7 +270,7 @@ public final class HumanBehavior {
   }
 
   private static double elapsedMinutes() {
-    return (System.currentTimeMillis() - SESSION_START) / (1000.0 * 60);
+    return (System.currentTimeMillis() - sessionStart) / (1000.0 * 60);
   }
 
   private static double fatigueBonus(double perHour) {
