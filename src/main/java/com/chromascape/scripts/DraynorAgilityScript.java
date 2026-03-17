@@ -157,3 +157,4 @@ public class DraynorAgilityScript extends BaseScript {
         return !ColourContours.getChromaObjsInColour(gameView, OBSTACLE_COLOUR).isEmpty();
     }
 }
+

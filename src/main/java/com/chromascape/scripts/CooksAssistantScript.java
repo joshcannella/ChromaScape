@@ -326,3 +326,4 @@ public class CooksAssistantScript extends BaseScript {
         return null;
     }
 }
+

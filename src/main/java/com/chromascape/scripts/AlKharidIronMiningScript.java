@@ -112,3 +112,4 @@ public class AlKharidIronMiningScript extends BaseScript {
         return TemplateMatching.match(IRON_ORE_IMAGE, slotImg, 0.05).bounds() != null;
     }
 }
+

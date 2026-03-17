@@ -9,6 +9,7 @@ import com.chromascape.utils.actions.ItemDropper;
 import com.chromascape.utils.actions.custom.KeyPress;
 import com.chromascape.utils.actions.custom.Logout;
 import com.chromascape.utils.actions.custom.Walk;
+import com.chromascape.utils.actions.PointSelector;
 import com.chromascape.utils.core.input.distribution.ClickDistribution;
 import com.chromascape.utils.core.screen.colour.ColourObj;
 import com.chromascape.utils.core.screen.topology.TemplateMatching;
@@ -65,17 +66,23 @@ public class DraynorFishCookScript extends BaseScript {
   private static final String RAW_SHRIMP = "/images/user/Raw_shrimps.png";
   private static final String COOKED_SHRIMP = "/images/user/Shrimps.png";
   private static final String BURNT_SHRIMP = "/images/user/Burnt_shrimp.png";
+  private static final String RAW_ANCHOVY = "/images/user/Raw_anchovies.png";
+  private static final String COOKED_ANCHOVY = "/images/user/Anchovies.png";
+  private static final String BURNT_ANCHOVY = "/images/user/Burnt_anchovies.png";
   private static final String LOGS = "/images/user/Logs.png";
   private static final String TINDERBOX = "/images/user/Tinderbox.png";
   private static final String NET = "/images/user/Small_fishing_net.png";
+  private static final String FIRE = "/images/user/Fire.png";
+
+  // === Item groups for matching ===
+  private static final String[] RAW_FISH = {RAW_SHRIMP, RAW_ANCHOVY};
+  private static final String[] COOKED_FISH = {COOKED_SHRIMP, COOKED_ANCHOVY, BURNT_SHRIMP, BURNT_ANCHOVY};
 
   // === Colour Definitions ===
   private static final ColourObj FISHING_SPOT_COLOUR =
       new ColourObj("cyan", new Scalar(90, 254, 254, 0), new Scalar(91, 255, 255, 0));
   private static final ColourObj TREE_COLOUR =
       new ColourObj("green", new Scalar(59, 254, 254, 0), new Scalar(60, 255, 255, 0));
-  private static final ColourObj FIRE_COLOUR =
-      new ColourObj("orange", new Scalar(15, 254, 254, 0), new Scalar(16, 255, 255, 0));
 
   // === Walker Tiles (Draynor Village) ===
   private static final Point FISHING_TILE = new Point(3087, 3228);
@@ -88,6 +95,7 @@ public class DraynorFishCookScript extends BaseScript {
 
   // === Constants ===
   private static final double INV_THRESHOLD = 0.07;
+  private static final double FIRE_THRESHOLD = 0.15;
   private static final int TARGET_RAW = COOKING_ENABLED ? 26 : 27; // reserve slots for tools
   private static final int FIRE_TIMEOUT_SECONDS = 10;
   private static final int MAX_STUCK_CYCLES = 10;
@@ -99,11 +107,9 @@ public class DraynorFishCookScript extends BaseScript {
 
   // === Cached inventory scan results (refreshed each cycle) ===
   private int rawCount;
-  private boolean hasCooked;
   private boolean hasLogs;
   private boolean hasTinderbox;
   private boolean hasNet;
-  private int occupiedSlots;
 
   @Override
   protected void cycle() {
@@ -135,32 +141,25 @@ public class DraynorFishCookScript extends BaseScript {
       return;
     }
 
-    // Determine state — check fire visibility once and reuse
-    boolean fireVisible = COOKING_ENABLED && ColourClick.isVisible(this, FIRE_COLOUR);
+    // Determine state — only override if not already set to DROP by cook()
+    if (state != State.DROP) {
+      boolean fireVisible = COOKING_ENABLED && isFireVisible();
 
-    if (hasCooked && rawCount == 0) {
-      state = State.DROP;
-    } else if (hasCooked && rawCount > 0) {
-      // Mixed inventory (fire died mid-cook or leftover) — drop cooked first
-      state = State.DROP;
-    } else if (COOKING_ENABLED && rawCount >= TARGET_RAW && !hasLogs && !fireVisible) {
-      state = State.CHOP;
-    } else if (COOKING_ENABLED && rawCount >= TARGET_RAW && hasLogs && !fireVisible) {
-      state = State.LIGHT_FIRE;
-    } else if (COOKING_ENABLED && rawCount >= TARGET_RAW && fireVisible) {
-      state = State.COOK;
-    } else if (!COOKING_ENABLED && rawCount >= TARGET_RAW) {
-      state = State.DROP;
-    } else if (occupiedSlots >= 28) {
-      // Inventory full but doesn't match any expected state — drop everything except tools
-      logger.warn("Inventory full with unexpected items, dropping.");
-      state = State.DROP;
-    } else {
-      state = State.FISH;
+      if (COOKING_ENABLED && rawCount >= TARGET_RAW && !hasLogs && !fireVisible) {
+        state = State.CHOP;
+      } else if (COOKING_ENABLED && rawCount >= TARGET_RAW && hasLogs && !fireVisible) {
+        state = State.LIGHT_FIRE;
+      } else if (COOKING_ENABLED && rawCount >= TARGET_RAW && fireVisible) {
+        state = State.COOK;
+      } else if (!COOKING_ENABLED && rawCount >= TARGET_RAW) {
+        state = State.DROP;
+      } else {
+        state = State.FISH;
+      }
     }
 
-    logger.info("State: {} | Raw: {} | Logs: {} | Cooked: {} | Stuck: {}",
-        state, rawCount, hasLogs, hasCooked, stuckCounter);
+    logger.info("State: {} | Raw: {} | Logs: {} | Stuck: {}",
+        state, rawCount, hasLogs, stuckCounter);
 
     switch (state) {
       case FISH -> fish();
@@ -176,38 +175,23 @@ public class DraynorFishCookScript extends BaseScript {
   /** Scans all 28 slots once and caches results for the entire cycle. */
   private void scanInventory() {
     rawCount = 0;
-    hasCooked = false;
     hasLogs = false;
     hasTinderbox = false;
     hasNet = false;
-    occupiedSlots = 0;
 
     for (int i = 0; i < 28; i++) {
       Rectangle slot = controller().zones().getInventorySlots().get(i);
       BufferedImage slotImg = ScreenManager.captureZone(slot);
 
-      if (TemplateMatching.match(RAW_SHRIMP, slotImg, INV_THRESHOLD).success()) {
+      if (TemplateMatching.match(RAW_SHRIMP, slotImg, INV_THRESHOLD).success()
+          || TemplateMatching.match(RAW_ANCHOVY, slotImg, INV_THRESHOLD).success()) {
         rawCount++;
-        occupiedSlots++;
-      } else if (!hasCooked && TemplateMatching.match(COOKED_SHRIMP, slotImg, INV_THRESHOLD).success()) {
-        hasCooked = true;
-        occupiedSlots++;
-      } else if (!hasCooked && TemplateMatching.match(BURNT_SHRIMP, slotImg, INV_THRESHOLD).success()) {
-        hasCooked = true;
-        occupiedSlots++;
       } else if (!hasLogs && TemplateMatching.match(LOGS, slotImg, INV_THRESHOLD).success()) {
         hasLogs = true;
-        occupiedSlots++;
       } else if (!hasTinderbox && TemplateMatching.match(TINDERBOX, slotImg, INV_THRESHOLD).success()) {
         hasTinderbox = true;
-        occupiedSlots++;
       } else if (!hasNet && TemplateMatching.match(NET, slotImg, INV_THRESHOLD).success()) {
         hasNet = true;
-        occupiedSlots++;
-      } else {
-        // Check if slot is non-empty (any match at all means occupied)
-        // For occupied count, we already counted known items above.
-        // Unknown items won't be counted perfectly, but the known items cover the normal case.
       }
     }
   }
@@ -233,7 +217,8 @@ public class DraynorFishCookScript extends BaseScript {
     int rawBefore = rawCount;
     Idler.waitUntilIdle(this, 120);
 
-    if (Inventory.countItem(this, RAW_SHRIMP, INV_THRESHOLD) > rawBefore) {
+    if (Inventory.countItem(this, RAW_SHRIMP, INV_THRESHOLD)
+        + Inventory.countItem(this, RAW_ANCHOVY, INV_THRESHOLD) > rawBefore) {
       stuckCounter = 0;
     } else {
       stuckCounter++;
@@ -286,7 +271,7 @@ public class DraynorFishCookScript extends BaseScript {
       return;
     }
 
-    if (ColourClick.isVisible(this, FIRE_COLOUR)) {
+    if (isFireVisible()) {
       stuckCounter = 0;
       return;
     }
@@ -298,15 +283,14 @@ public class DraynorFishCookScript extends BaseScript {
 
     // Wait for fire to appear
     LocalDateTime deadline = LocalDateTime.now().plusSeconds(FIRE_TIMEOUT_SECONDS);
-    while (!ColourClick.isVisible(this, FIRE_COLOUR) && LocalDateTime.now().isBefore(deadline)) {
+    while (!isFireVisible() && LocalDateTime.now().isBefore(deadline)) {
       checkInterrupted();
       waitMillis(500);
     }
 
-    if (ColourClick.isVisible(this, FIRE_COLOUR)) {
+    if (isFireVisible()) {
       stuckCounter = 0;
     } else {
-      // "Can't light fire here" — walk a tile away and retry next cycle
       logger.warn("Fire failed, relocating.");
       if (!Walk.to(this, FIRE_RELOCATE_TILE, "fire relocate")) stuckCounter++;
     }
@@ -315,22 +299,27 @@ public class DraynorFishCookScript extends BaseScript {
   // ======================== COOK ========================
 
   private void cook() {
-    if (!Inventory.hasItem(this, RAW_SHRIMP, INV_THRESHOLD)) {
+    if (!Inventory.hasItem(this, RAW_SHRIMP, INV_THRESHOLD)
+        && !Inventory.hasItem(this, RAW_ANCHOVY, INV_THRESHOLD)) {
       stuckCounter = 0;
       return;
     }
 
-    if (!ColourClick.isVisible(this, FIRE_COLOUR)) {
+    if (!isFireVisible()) {
       logger.info("Fire not visible, need to re-light.");
       stuckCounter++;
       return;
     }
 
-    // Use raw shrimp on fire
-    Inventory.clickItem(this, RAW_SHRIMP, INV_THRESHOLD, "medium");
+    // Use raw fish on fire — click whichever type is present
+    if (Inventory.hasItem(this, RAW_SHRIMP, INV_THRESHOLD)) {
+      Inventory.clickItem(this, RAW_SHRIMP, INV_THRESHOLD, "medium");
+    } else {
+      Inventory.clickItem(this, RAW_ANCHOVY, INV_THRESHOLD, "medium");
+    }
     HumanBehavior.sleep(200, 400);
 
-    Point fireLoc = ColourClick.getClickPoint(this, FIRE_COLOUR);
+    Point fireLoc = findFireInGameView();
     if (fireLoc == null) {
       logger.warn("Could not get fire click point.");
       stuckCounter++;
@@ -346,28 +335,38 @@ public class DraynorFishCookScript extends BaseScript {
     // Wait for full cook — Idler handles the blocking
     Idler.waitUntilIdle(this, 90);
     stuckCounter = 0;
+    state = State.DROP;
   }
 
   // ======================== DROP ========================
 
   private void drop() {
-    int tinderboxSlot = Inventory.findItemSlot(this, TINDERBOX, INV_THRESHOLD);
-    int netSlot = Inventory.findItemSlot(this, NET, INV_THRESHOLD);
+    String[] droppable = {COOKED_SHRIMP, BURNT_SHRIMP, COOKED_ANCHOVY, BURNT_ANCHOVY, RAW_SHRIMP, RAW_ANCHOVY, LOGS};
 
-    int[] exclude;
-    if (tinderboxSlot >= 0 && netSlot >= 0) {
-      exclude = new int[]{tinderboxSlot, netSlot};
-    } else if (tinderboxSlot >= 0) {
-      exclude = new int[]{tinderboxSlot};
-    } else if (netSlot >= 0) {
-      exclude = new int[]{netSlot};
-    } else {
-      exclude = new int[0];
+    controller().keyboard().sendModifierKey(401, "shift");
+    waitRandomMillis(100, 250);
+
+    try {
+      for (int i = 0; i < 28; i++) {
+        Rectangle slot = controller().zones().getInventorySlots().get(i);
+        BufferedImage slotImg = ScreenManager.captureZone(slot);
+        for (String item : droppable) {
+          if (TemplateMatching.match(item, slotImg, INV_THRESHOLD).success()) {
+            Point clickLoc = ClickDistribution.generateRandomPoint(slot);
+            controller().mouse().moveTo(clickLoc, "fast");
+            controller().mouse().leftClick();
+            waitRandomMillis(40, 90);
+            break;
+          }
+        }
+      }
+    } finally {
+      waitRandomMillis(100, 200);
+      controller().keyboard().sendModifierKey(402, "shift");
     }
 
-    ItemDropper.dropAll(this, ItemDropper.DropPattern.ZIGZAG, exclude);
-    HumanBehavior.sleep(300, 500);
     stuckCounter = 0;
+    state = State.FISH;
     logger.info("Dropped all fish.");
   }
 
@@ -378,8 +377,7 @@ public class DraynorFishCookScript extends BaseScript {
     for (int i = 0; i < 28; i++) {
       Rectangle slot = controller().zones().getInventorySlots().get(i);
       BufferedImage slotImg = ScreenManager.captureZone(slot);
-      if (TemplateMatching.match(COOKED_SHRIMP, slotImg, INV_THRESHOLD).success()
-          || TemplateMatching.match(BURNT_SHRIMP, slotImg, INV_THRESHOLD).success()) {
+      if (matchesAny(slotImg, COOKED_FISH)) {
         controller().keyboard().sendModifierKey(401, "shift");
         waitRandomMillis(80, 150);
         Point clickLoc = ClickDistribution.generateRandomPoint(slot);
@@ -392,4 +390,24 @@ public class DraynorFishCookScript extends BaseScript {
     }
   }
 
+  /** Checks if a fire is visible in the game view via template matching. */
+  private boolean isFireVisible() {
+    return findFireInGameView() != null;
+  }
+
+  /** Returns a click point for the fire in the game view, or null if not found. */
+  private Point findFireInGameView() {
+    BufferedImage gameView = controller().zones().getGameView();
+    return PointSelector.getRandomPointInImage(FIRE, gameView, FIRE_THRESHOLD);
+  }
+
+  /** Returns true if the slot image matches any of the given templates. */
+  private boolean matchesAny(BufferedImage slotImg, String[] templates) {
+    for (String t : templates) {
+      if (TemplateMatching.match(t, slotImg, INV_THRESHOLD).success()) return true;
+    }
+    return false;
+  }
+
 }
+
