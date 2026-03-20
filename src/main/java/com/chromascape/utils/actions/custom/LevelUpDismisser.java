@@ -28,23 +28,27 @@ public class LevelUpDismisser {
   private static final ColourObj BLACK =
       new ColourObj("black", new Scalar(0, 0, 0, 0), new Scalar(0, 0, 0, 0));
 
+  // "Click here to continue" is rendered in blue during active dialogs
+  private static final ColourObj DIALOG_BLUE =
+      new ColourObj("dialogBlue", new Scalar(110, 200, 200, 0), new Scalar(130, 255, 255, 0));
+
   /**
-   * Checks the chatbox for a level-up dialog and dismisses it by pressing space.
+   * Checks the chatbox for an active dialog ("Click here to continue" in red)
+   * and dismisses it by pressing space.
    *
    * @param base the active {@link BaseScript} instance, usually passed as {@code this}
-   * @return {@code true} if a level-up was detected and dismissed, {@code false} otherwise
+   * @return {@code true} if a dialog was detected and dismissed, {@code false} otherwise
    */
   public static boolean dismissIfPresent(BaseScript base) {
-    Rectangle latestMsg = base.controller().zones().getChatTabs().get("Latest Message");
-    if (latestMsg == null) {
+    Rectangle chatZone = base.controller().zones().getChatTabs().get("Chat");
+    if (chatZone == null) {
       return false;
     }
 
-    String text = Ocr.extractText(latestMsg, "Plain 12", BLACK, true).toLowerCase();
-    if (text.contains("congratulations") || text.contains("advanced")) {
-      logger.info("Level-up detected, dismissing.");
+    String blueText = Ocr.extractText(chatZone, "Plain 12", DIALOG_BLUE, true).toLowerCase();
+    if (blueText.contains("click here") || blueText.contains("continue")) {
+      logger.info("Level-up dialog detected, dismissing.");
       KeyPress.space(base);
-      // Dismiss twice in case there's a follow-up dialog
       BaseScript.waitRandomMillis(300, 500);
       KeyPress.space(base);
       return true;

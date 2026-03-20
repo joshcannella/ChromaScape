@@ -12,7 +12,9 @@ import com.chromascape.utils.actions.custom.Walk;
 import com.chromascape.utils.actions.custom.HumanBehavior;
 import com.chromascape.utils.actions.custom.LevelUpDismisser;
 import com.chromascape.utils.core.screen.colour.ColourObj;
+import com.chromascape.utils.domain.ocr.Ocr;
 import java.awt.Point;
+import java.awt.Rectangle;
 import java.time.Duration;
 import java.time.Instant;
 import org.apache.logging.log4j.LogManager;
@@ -50,9 +52,8 @@ public class DraynorFishingScript extends BaseScript {
       new ColourObj("cyan", new Scalar(90, 254, 254, 0), new Scalar(91, 255, 255, 0));
   private static final ColourObj BANK_COLOUR =
       new ColourObj("red", new Scalar(0, 254, 254, 0), new Scalar(1, 255, 255, 0));
-
-  // All items that can appear in inventory (for isFull check)
-  private static final String[] KNOWN_ITEMS = {RAW_SHRIMP, RAW_ANCHOVY, NET};
+  private static final ColourObj CHAT_BLACK =
+      new ColourObj("black", new Scalar(0, 0, 0, 0), new Scalar(0, 0, 0, 0));
 
   // === Walker Tiles ===
   private static final Point FISHING_TILE = new Point(3087, 3228);
@@ -66,6 +67,7 @@ public class DraynorFishingScript extends BaseScript {
   private static final int MAX_STUCK_CYCLES = 10;
 
   private int stuckCounter = 0;
+  private boolean inventoryFull = false;
 
   @Override
   protected void cycle() {
@@ -86,10 +88,10 @@ public class DraynorFishingScript extends BaseScript {
       return;
     }
 
-    // Inventory full — count empty slots in a single pass
-    int emptySlots = countEmptySlots();
-    if (emptySlots == 0) {
+    // Inventory full — detected via chat message
+    if (inventoryFull) {
       logger.info("Inventory full.");
+      inventoryFull = false;
       if (BANKING_ENABLED) {
         bank();
       } else {
@@ -98,7 +100,7 @@ public class DraynorFishingScript extends BaseScript {
       return;
     }
 
-    logger.info("Empty slots: {} | Stuck: {}", emptySlots, stuckCounter);
+    logger.info("Stuck: {}", stuckCounter);
 
     // Fish
     fish();
@@ -130,7 +132,21 @@ public class DraynorFishingScript extends BaseScript {
     }
 
     LevelUpDismisser.dismissIfPresent(this);
+    checkInventoryFullChat();
     stuckCounter = 0;
+  }
+
+  /**
+   * Reads the chatbox for "can't carry" to detect a full inventory.
+   */
+  private void checkInventoryFullChat() {
+    Rectangle chat = controller().zones().getChatTabs().get("Chat");
+    if (chat == null) return;
+    String text = Ocr.extractText(chat, "Plain 12", CHAT_BLACK, true).toLowerCase();
+    if (text.contains("can't carry") || text.contains("full")) {
+      logger.info("Chat says inventory full.");
+      inventoryFull = true;
+    }
   }
 
   private void bank() {
@@ -189,54 +205,6 @@ public class DraynorFishingScript extends BaseScript {
     java.awt.image.BufferedImage gameView = controller().zones().getGameView();
     return com.chromascape.utils.actions.PointSelector.getRandomPointInImage(
         image, gameView, threshold);
-  }
-
-  /**
-   * Counts empty inventory slots by checking pixel variance. Empty slots have uniform dark
-   * backgrounds with very low variance. Slots containing items have significantly higher variance.
-   */
-  private int countEmptySlots() {
-    int empty = 0;
-    for (int i = 0; i < 28; i++) {
-      java.awt.Rectangle slot = controller().zones().getInventorySlots().get(i);
-      java.awt.image.BufferedImage slotImg =
-          com.chromascape.utils.core.screen.window.ScreenManager.captureZone(slot);
-      double v = slotVariance(slotImg);
-      if (v < 50) {
-        empty++;
-      } else {
-        logger.debug("Slot {} variance: {}", i, String.format("%.1f", v));
-      }
-    }
-    return empty;
-  }
-
-  private double slotVariance(java.awt.image.BufferedImage img) {
-    long totalR = 0, totalG = 0, totalB = 0;
-    int pixels = img.getWidth() * img.getHeight();
-    for (int y = 0; y < img.getHeight(); y++) {
-      for (int x = 0; x < img.getWidth(); x++) {
-        int rgb = img.getRGB(x, y);
-        totalR += (rgb >> 16) & 0xFF;
-        totalG += (rgb >> 8) & 0xFF;
-        totalB += rgb & 0xFF;
-      }
-    }
-    double avgR = (double) totalR / pixels;
-    double avgG = (double) totalG / pixels;
-    double avgB = (double) totalB / pixels;
-
-    double variance = 0;
-    for (int y = 0; y < img.getHeight(); y++) {
-      for (int x = 0; x < img.getWidth(); x++) {
-        int rgb = img.getRGB(x, y);
-        double dr = ((rgb >> 16) & 0xFF) - avgR;
-        double dg = ((rgb >> 8) & 0xFF) - avgG;
-        double db = (rgb & 0xFF) - avgB;
-        variance += dr * dr + dg * dg + db * db;
-      }
-    }
-    return variance / pixels;
   }
 
   private void drop() {
