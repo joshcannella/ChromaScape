@@ -55,8 +55,9 @@ Thumbs.db
 # Templates
 /src/main/resources/fonts/
 /src/main/resources/images/ui/
-/src/main/resources/images/user/*
-!/src/main/resources/images/user/.gitkeep
+# Upstream ignores user images; we track them in our fork
+# /src/main/resources/images/user/*
+# !/src/main/resources/images/user/.gitkeep
 
 # output
 output/*
