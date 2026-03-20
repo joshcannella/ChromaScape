@@ -29,6 +29,14 @@ public class Idler {
   private static final Logger logger = LogManager.getLogger(Idler.class);
   private static volatile String lastMessage = "";
 
+  /** Seeds the dedup timestamp from the current chat so stale messages are ignored. */
+  public static void seedLastMessage(BaseScript base) {
+    Rectangle latestMessage = base.controller().zones().getChatTabs().get("Latest Message");
+    if (latestMessage != null) {
+      lastMessage = Ocr.extractText(latestMessage, "Plain 12", black, true);
+    }
+  }
+
   private static final ColourObj black =
       new ColourObj("black", new Scalar(0, 0, 0, 0), new Scalar(0, 0, 0, 0));
   // RuneLite Idle Notifier plugin red text
