@@ -10,9 +10,11 @@ import com.chromascape.utils.actions.ItemDropper;
 import com.chromascape.utils.actions.custom.Logout;
 import com.chromascape.utils.actions.custom.Walk;
 import com.chromascape.utils.actions.custom.HumanBehavior;
-import com.chromascape.utils.actions.custom.KeyPress;
+import com.chromascape.utils.actions.custom.LevelUpDismisser;
 import com.chromascape.utils.core.screen.colour.ColourObj;
 import java.awt.Point;
+import java.time.Duration;
+import java.time.Instant;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.bytedeco.opencv.opencv_core.Scalar;
@@ -28,7 +30,7 @@ import org.bytedeco.opencv.opencv_core.Scalar;
  * <p><b>RuneLite Setup:</b>
  * <ul>
  *   <li>NPC Indicators — highlight fishing spot in Cyan (HSV ~90, 254-255, 254-255)</li>
- *   <li>Object Markers — highlight Draynor bank booth in Magenta (HSV ~150, 254-255, 254-255)</li>
+ *   <li>Object Markers — highlight Draynor bank booth in Red (HSV ~0-1, 254-255, 254-255)</li>
  *   <li>Idle Notifier — enabled</li>
  * </ul>
  *
@@ -49,6 +51,9 @@ public class DraynorFishingScript extends BaseScript {
   private static final ColourObj BANK_COLOUR =
       new ColourObj("red", new Scalar(0, 254, 254, 0), new Scalar(1, 255, 255, 0));
 
+  // All items that can appear in inventory (for isFull check)
+  private static final String[] KNOWN_ITEMS = {RAW_SHRIMP, RAW_ANCHOVY, NET};
+
   // === Walker Tiles ===
   private static final Point FISHING_TILE = new Point(3087, 3228);
   private static final Point BANK_TILE = new Point(3092, 3245);
@@ -58,7 +63,6 @@ public class DraynorFishingScript extends BaseScript {
 
   // === Constants ===
   private static final double INV_THRESHOLD = 0.07;
-  private static final int TARGET_RAW = 27; // 28 slots minus net
   private static final int MAX_STUCK_CYCLES = 10;
 
   private int stuckCounter = 0;
@@ -82,13 +86,10 @@ public class DraynorFishingScript extends BaseScript {
       return;
     }
 
-    int rawCount = Inventory.countItem(this, RAW_SHRIMP, INV_THRESHOLD)
-        + Inventory.countItem(this, RAW_ANCHOVY, INV_THRESHOLD);
-
-    logger.info("Raw: {} | Stuck: {}", rawCount, stuckCounter);
-
-    // Inventory full
-    if (rawCount >= TARGET_RAW) {
+    // Inventory full — count empty slots in a single pass
+    int emptySlots = countEmptySlots();
+    if (emptySlots == 0) {
+      logger.info("Inventory full.");
       if (BANKING_ENABLED) {
         bank();
       } else {
@@ -96,6 +97,8 @@ public class DraynorFishingScript extends BaseScript {
       }
       return;
     }
+
+    logger.info("Empty slots: {} | Stuck: {}", emptySlots, stuckCounter);
 
     // Fish
     fish();
@@ -108,7 +111,7 @@ public class DraynorFishingScript extends BaseScript {
       return;
     }
 
-    Point spotLoc = ColourClick.getClickPoint(this, FISHING_SPOT_COLOUR);
+    Point spotLoc = ColourClick.getClickPoint(this, FISHING_SPOT_COLOUR, 10.0);
     if (spotLoc == null) {
       stuckCounter++;
       return;
@@ -116,30 +119,51 @@ public class DraynorFishingScript extends BaseScript {
 
     controller().mouse().moveTo(spotLoc, "medium");
     controller().mouse().leftClick();
-    Idler.waitUntilIdle(this, 120);
+
+    // Wait for idle or fishing spot to disappear (spot moved)
+    Instant deadline = Instant.now().plus(Duration.ofSeconds(120));
+    BaseScript.waitMillis(600);
+    while (Instant.now().isBefore(deadline)) {
+      checkInterrupted();
+      if (Idler.waitUntilIdle(this, 3)) break;
+      if (!ColourClick.isVisible(this, FISHING_SPOT_COLOUR)) break;
+    }
+
+    LevelUpDismisser.dismissIfPresent(this);
     stuckCounter = 0;
   }
 
   private void bank() {
-    // Walk to bank
+    // Walk to bank if not visible
     if (!ColourClick.isVisible(this, BANK_COLOUR)) {
       logger.info("Bank not visible, walking.");
       if (!Walk.to(this, BANK_TILE, "bank")) {
         stuckCounter++;
         return;
       }
+      if (!ColourClick.isVisible(this, BANK_COLOUR)) {
+        logger.warn("Bank still not visible after walking.");
+        stuckCounter++;
+        return;
+      }
     }
 
-    // Open bank
-    Bank.open(this, BANK_COLOUR.name());
+    // Open bank using ColourObj directly (Bank.open uses string-based ColourInstances lookup)
+    Point bankLoc = ColourClick.getClickPoint(this, BANK_COLOUR);
+    if (bankLoc == null) {
+      logger.error("Bank booth not found after walking.");
+      stuckCounter++;
+      return;
+    }
+    controller().mouse().moveTo(bankLoc, "medium");
+    controller().mouse().leftClick();
+    waitMillis(HumanBehavior.adjustDelay(1200, 1800));
 
     // Deposit all then withdraw net
     Bank.depositAll(this);
     waitMillis(HumanBehavior.adjustDelay(300, 500));
 
     // Net is now in bank — click it in the bank tab to withdraw
-    // The bank grid starts at a fixed offset; first item will be the net if bank was empty
-    // Use template matching on the game view to find and click it
     Point netLoc = findImageInGameView(NET, INV_THRESHOLD);
     if (netLoc != null) {
       controller().mouse().moveTo(netLoc, "medium");
@@ -167,6 +191,54 @@ public class DraynorFishingScript extends BaseScript {
         image, gameView, threshold);
   }
 
+  /**
+   * Counts empty inventory slots by checking pixel variance. Empty slots have uniform dark
+   * backgrounds with very low variance. Slots containing items have significantly higher variance.
+   */
+  private int countEmptySlots() {
+    int empty = 0;
+    for (int i = 0; i < 28; i++) {
+      java.awt.Rectangle slot = controller().zones().getInventorySlots().get(i);
+      java.awt.image.BufferedImage slotImg =
+          com.chromascape.utils.core.screen.window.ScreenManager.captureZone(slot);
+      double v = slotVariance(slotImg);
+      if (v < 50) {
+        empty++;
+      } else {
+        logger.debug("Slot {} variance: {}", i, String.format("%.1f", v));
+      }
+    }
+    return empty;
+  }
+
+  private double slotVariance(java.awt.image.BufferedImage img) {
+    long totalR = 0, totalG = 0, totalB = 0;
+    int pixels = img.getWidth() * img.getHeight();
+    for (int y = 0; y < img.getHeight(); y++) {
+      for (int x = 0; x < img.getWidth(); x++) {
+        int rgb = img.getRGB(x, y);
+        totalR += (rgb >> 16) & 0xFF;
+        totalG += (rgb >> 8) & 0xFF;
+        totalB += rgb & 0xFF;
+      }
+    }
+    double avgR = (double) totalR / pixels;
+    double avgG = (double) totalG / pixels;
+    double avgB = (double) totalB / pixels;
+
+    double variance = 0;
+    for (int y = 0; y < img.getHeight(); y++) {
+      for (int x = 0; x < img.getWidth(); x++) {
+        int rgb = img.getRGB(x, y);
+        double dr = ((rgb >> 16) & 0xFF) - avgR;
+        double dg = ((rgb >> 8) & 0xFF) - avgG;
+        double db = (rgb & 0xFF) - avgB;
+        variance += dr * dr + dg * dg + db * db;
+      }
+    }
+    return variance / pixels;
+  }
+
   private void drop() {
     int netSlot = Inventory.findItemSlot(this, NET, INV_THRESHOLD);
     int[] exclude = netSlot >= 0 ? new int[]{netSlot} : new int[0];
@@ -175,4 +247,3 @@ public class DraynorFishingScript extends BaseScript {
     logger.info("Dropped all fish.");
   }
 }
-

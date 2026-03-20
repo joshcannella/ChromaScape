@@ -270,4 +270,3 @@ public class ChickenKillerScript extends BaseScript {
         getRequiredLevels(currentStyle), currentStyle);
   }
 }
-

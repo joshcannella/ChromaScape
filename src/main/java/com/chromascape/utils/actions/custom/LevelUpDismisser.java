@@ -35,12 +35,12 @@ public class LevelUpDismisser {
    * @return {@code true} if a level-up was detected and dismissed, {@code false} otherwise
    */
   public static boolean dismissIfPresent(BaseScript base) {
-    Rectangle chatZone = base.controller().zones().getChatTabs().get("Chat");
-    if (chatZone == null) {
+    Rectangle latestMsg = base.controller().zones().getChatTabs().get("Latest Message");
+    if (latestMsg == null) {
       return false;
     }
 
-    String text = Ocr.extractText(chatZone, "Plain 12", BLACK, true).toLowerCase();
+    String text = Ocr.extractText(latestMsg, "Plain 12", BLACK, true).toLowerCase();
     if (text.contains("congratulations") || text.contains("advanced")) {
       logger.info("Level-up detected, dismissing.");
       KeyPress.space(base);

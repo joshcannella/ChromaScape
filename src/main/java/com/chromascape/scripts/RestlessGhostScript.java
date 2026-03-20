@@ -254,4 +254,3 @@ public class RestlessGhostScript extends BaseScript {
     }
   }
 }
-

@@ -112,4 +112,3 @@ public class AlKharidGoldMiningScript extends BaseScript {
         return TemplateMatching.match(GOLD_ORE_IMAGE, slotImg, 0.05).bounds() != null;
     }
 }
-

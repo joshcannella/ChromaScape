@@ -45,6 +45,14 @@ public final class ColourClick {
    * Uses bounding box + ClickDistribution to avoid PointSelector OpenCV crash.
    */
   public static Point getClickPoint(BaseScript base, ColourObj colour) {
+    return getClickPoint(base, colour, 0);
+  }
+
+  /**
+   * Gets a random click point within the closest colour object with tightness control.
+   * Higher tightness clusters clicks toward the center. 0 uses default distribution.
+   */
+  public static Point getClickPoint(BaseScript base, ColourObj colour, double tightness) {
     BufferedImage gameView = base.controller().zones().getGameView();
     List<ChromaObj> objs = ColourContours.getChromaObjsInColour(gameView, colour);
     if (objs.isEmpty()) {
@@ -52,7 +60,9 @@ public final class ColourClick {
     }
     try {
       ChromaObj closest = ColourContours.getChromaObjClosestToCentre(objs);
-      return ClickDistribution.generateRandomPoint(closest.boundingBox());
+      return tightness > 0
+          ? ClickDistribution.generateRandomPoint(closest.boundingBox(), tightness)
+          : ClickDistribution.generateRandomPoint(closest.boundingBox());
     } catch (Exception e) {
       logger.warn("Failed to generate click point: {}", e.getMessage());
       return null;
