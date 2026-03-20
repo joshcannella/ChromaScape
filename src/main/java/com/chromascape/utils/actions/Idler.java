@@ -25,14 +25,17 @@ public class Idler {
       new ColourObj("black", new Scalar(0, 0, 0, 0), new Scalar(0, 0, 0, 0));
   private static final ColourObj chatRed =
       new ColourObj("chatRed", new Scalar(177, 229, 239, 0), new Scalar(179, 240, 240, 0));
+  // Game's native red text (e.g. "You are no longer in combat!")
+  private static final ColourObj gameRed =
+      new ColourObj("gameRed", new Scalar(0, 200, 200, 0), new Scalar(5, 255, 255, 0));
 
   /**
    * Waits until either the specified timeout has elapsed or until the client chatbox reports that
    * the player is idle.
    *
    * <p>Specifically, this method monitors the "Latest Message" zone in the chatbox for a red
-   * message containing the substring {@code "idle"} or {@code "moving"}, which typically appears
-   * when using the Idle Notifier plugin
+   * message containing the substring {@code "idle"}, {@code "moving"}, or {@code "combat"}, which
+   * typically appears when using the Idle Notifier plugin or from the game's native combat messages.
    *
    * @param base the active {@link BaseScript} instance, usually passed as {@code this}
    * @param timeoutSeconds the maximum number of seconds to remain idle before continuing
@@ -49,8 +52,11 @@ public class Idler {
       BaseScript.waitMillis(300);
       Rectangle latestMessage = base.controller().zones().getChatTabs().get("Latest Message");
       String idleText = Ocr.extractText(latestMessage, "Plain 12", chatRed, true);
+      String gameText = Ocr.extractText(latestMessage, "Plain 12", gameRed, true);
       String timeStamp = Ocr.extractText(latestMessage, "Plain 12", black, true);
-      if ((idleText.contains("moving") || idleText.contains("idle"))
+      String combined = idleText + gameText;
+      if ((combined.contains("moving") || combined.contains("idle")
+              || combined.contains("combat"))
           && !timeStamp.equals(lastMessage)) {
         lastMessage = timeStamp;
         return true;
