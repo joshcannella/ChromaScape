@@ -224,18 +224,18 @@ public final class HumanBehavior {
 
   public static void performCameraFidget(BaseScript script) {
     BaseScript.checkInterrupted();
-    int dragX = ThreadLocalRandom.current().nextInt(-40, 41);
-    int dragY = ThreadLocalRandom.current().nextInt(-15, 16);
+    int dragX = ThreadLocalRandom.current().nextInt(-12, 13);
+    int dragY = ThreadLocalRandom.current().nextInt(-5, 6);
     logger.debug("Camera fidget dx={} dy={}", dragX, dragY);
 
     PointerInfo pi = MouseInfo.getPointerInfo();
     Point anchor = (pi != null) ? pi.getLocation() : new Point(400, 300);
 
     script.controller().mouse().middleClick(501);
-    BaseScript.waitRandomMillis(50, 120);
+    BaseScript.waitRandomMillis(80, 180);
     script.controller().mouse().moveTo(
-        new Point(anchor.x + dragX, anchor.y + dragY), "fast");
-    BaseScript.waitRandomMillis(50, 100);
+        new Point(anchor.x + dragX, anchor.y + dragY), "slow");
+    BaseScript.waitRandomMillis(80, 150);
     script.controller().mouse().middleClick(502);
   }
 
