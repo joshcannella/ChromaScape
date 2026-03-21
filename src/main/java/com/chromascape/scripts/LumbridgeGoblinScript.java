@@ -5,7 +5,6 @@ import com.chromascape.base.BaseScript;
 import com.chromascape.utils.actions.Idler;
 import com.chromascape.utils.actions.IdleType;
 import com.chromascape.utils.actions.Minimap;
-import com.chromascape.utils.actions.MovingObject;
 import com.chromascape.utils.actions.custom.ColourClick;
 import com.chromascape.utils.actions.custom.Combat;
 import com.chromascape.utils.actions.custom.HumanBehavior;
@@ -119,12 +118,15 @@ public class LumbridgeGoblinScript extends BaseScript {
       return;
     }
 
-    // Try to engage a goblin
+    // Try to engage the closest goblin
     for (int attempt = 0; attempt < MAX_ENGAGE_ATTEMPTS; attempt++) {
-      if (!MovingObject.clickMovingObjectByColourObjUntilRedClick(GOBLIN_COLOUR, this)) {
-        logger.warn("Failed to red-click goblin (attempt {})", attempt + 1);
+      Point goblin = ColourClick.getClickPoint(this, GOBLIN_COLOUR);
+      if (goblin == null) {
+        logger.warn("No goblin click point (attempt {})", attempt + 1);
         continue;
       }
+      controller().mouse().moveTo(goblin, "fast");
+      controller().mouse().leftClick();
       if (waitForFirstHit(previousXp)) {
         stuckCounter = 0;
         inCombat = true;
