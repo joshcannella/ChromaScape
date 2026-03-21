@@ -2,19 +2,17 @@ package com.chromascape.scripts;
 
 import com.chromascape.api.DiscordNotification;
 import com.chromascape.base.BaseScript;
+import com.chromascape.utils.actions.Idler;
+import com.chromascape.utils.actions.ItemDropper;
 import com.chromascape.utils.actions.custom.Bank;
 import com.chromascape.utils.actions.custom.ColourClick;
-import com.chromascape.utils.actions.Idler;
+import com.chromascape.utils.actions.custom.HumanBehavior;
 import com.chromascape.utils.actions.custom.Inventory;
-import com.chromascape.utils.actions.ItemDropper;
+import com.chromascape.utils.actions.custom.LevelUpDismisser;
 import com.chromascape.utils.actions.custom.Logout;
 import com.chromascape.utils.actions.custom.Walk;
-import com.chromascape.utils.actions.custom.HumanBehavior;
-import com.chromascape.utils.actions.custom.LevelUpDismisser;
 import com.chromascape.utils.core.screen.colour.ColourObj;
-import com.chromascape.utils.domain.ocr.Ocr;
 import java.awt.Point;
-import java.awt.Rectangle;
 import java.time.Duration;
 import java.time.Instant;
 import org.apache.logging.log4j.LogManager;
@@ -24,14 +22,13 @@ import org.bytedeco.opencv.opencv_core.Scalar;
 /**
  * Fishes shrimp and anchovies at Draynor Village. Banks or drops when inventory is full.
  *
- * <p><b>Flow (banking on):</b> FISH until 27 raw → WALK to bank → DEPOSIT ALL → WITHDRAW net →
- * WALK back → repeat
+ * <p><b>Flow (banking on):</b> FISH → WALK_TO_BANK → BANKING → WALK_TO_FISH → repeat
  *
- * <p><b>Flow (banking off):</b> FISH until 27 raw → DROP all except net → repeat
+ * <p><b>Flow (banking off):</b> FISH → DROP → repeat
  *
  * <p><b>RuneLite Setup:</b>
  * <ul>
- *   <li>NPC Indicators — highlight fishing spot in Cyan (HSV ~90, 254-255, 254-255)</li>
+ *   <li>NPC Indicators — highlight "Fishing spot" in Cyan (HSV ~90, 254-255, 254-255)</li>
  *   <li>Object Markers — highlight Draynor bank booth in Red (HSV ~0-1, 254-255, 254-255)</li>
  *   <li>Idle Notifier — enabled</li>
  * </ul>
@@ -41,6 +38,10 @@ import org.bytedeco.opencv.opencv_core.Scalar;
 public class DraynorFishingScript extends BaseScript {
 
   private static final Logger logger = LogManager.getLogger(DraynorFishingScript.class);
+
+  private enum State {
+    FISHING, WALK_TO_BANK, BANKING, WALK_TO_FISH, DROP
+  }
 
   // === Image Templates ===
   private static final String RAW_SHRIMP = "/images/user/Raw_shrimps.png";
@@ -61,13 +62,11 @@ public class DraynorFishingScript extends BaseScript {
 
   // === Configuration ===
   private static final boolean BANKING_ENABLED = true;
-
-  // === Constants ===
-  private static final double INV_THRESHOLD = 0.07;
+  private static final double THRESHOLD = 0.07;
   private static final int MAX_STUCK_CYCLES = 10;
 
+  private State state = State.FISHING;
   private int stuckCounter = 0;
-  private boolean inventoryFull = false;
 
   @Override
   protected void cycle() {
@@ -81,29 +80,22 @@ public class DraynorFishingScript extends BaseScript {
       return;
     }
 
-    if (!Inventory.hasItem(this, NET, INV_THRESHOLD)) {
+    if (!Inventory.hasItem(this, NET, THRESHOLD)) {
       logger.error("No small fishing net in inventory.");
       DiscordNotification.send("DraynorFishing: No fishing net. Stopping.");
       stop();
       return;
     }
 
-    // Inventory full — detected via chat message
-    if (inventoryFull) {
-      logger.info("Inventory full.");
-      inventoryFull = false;
-      if (BANKING_ENABLED) {
-        bank();
-      } else {
-        drop();
-      }
-      return;
+    logger.info("State: {} | Stuck: {}", state, stuckCounter);
+
+    switch (state) {
+      case FISHING -> fish();
+      case WALK_TO_BANK -> walkToBank();
+      case BANKING -> bank();
+      case WALK_TO_FISH -> walkToFish();
+      case DROP -> drop();
     }
-
-    logger.info("Stuck: {}", stuckCounter);
-
-    // Fish
-    fish();
   }
 
   private void fish() {
@@ -113,105 +105,109 @@ public class DraynorFishingScript extends BaseScript {
       return;
     }
 
-    Point spotLoc = ColourClick.getClickPoint(this, FISHING_SPOT_COLOUR, 10.0);
-    if (spotLoc == null) {
+    Point spot = ColourClick.getClickPoint(this, FISHING_SPOT_COLOUR, 10.0);
+    if (spot == null) {
       stuckCounter++;
       return;
     }
 
-    controller().mouse().moveTo(spotLoc, "medium");
+    String speed = HumanBehavior.shouldSlowApproach() ? "slow" : "medium";
+    controller().mouse().moveTo(spot, speed);
+    if (HumanBehavior.shouldHesitate()) HumanBehavior.performHesitation();
+    if (HumanBehavior.shouldMisclick()) {
+      HumanBehavior.performMisclick(this, spot);
+      controller().mouse().moveTo(spot, "medium");
+    }
+    controller().mouse().microJitter();
     controller().mouse().leftClick();
 
-    // Wait for idle or fishing spot to disappear (spot moved)
     Instant deadline = Instant.now().plus(Duration.ofSeconds(120));
-    BaseScript.waitMillis(600);
+    waitMillis(600);
     while (Instant.now().isBefore(deadline)) {
       checkInterrupted();
       if (Idler.waitUntilIdle(this, 3)) break;
       if (!ColourClick.isVisible(this, FISHING_SPOT_COLOUR)) break;
+      waitMillis(300);
     }
 
     LevelUpDismisser.dismissIfPresent(this);
-    checkInventoryFullChat();
-    stuckCounter = 0;
+
+    if (Inventory.isFullByChat(this, CHAT_BLACK)) {
+      State next = BANKING_ENABLED ? State.WALK_TO_BANK : State.DROP;
+      logger.info("Inventory full. State: FISHING → {}", next);
+      state = next;
+      stuckCounter = 0;
+    }
   }
 
-  /**
-   * Reads the chatbox for "can't carry" to detect a full inventory.
-   */
-  private void checkInventoryFullChat() {
-    Rectangle chat = controller().zones().getChatTabs().get("Chat");
-    if (chat == null) return;
-    String text = Ocr.extractText(chat, "Plain 12", CHAT_BLACK, true).toLowerCase();
-    if (text.contains("can't carry") || text.contains("full")) {
-      logger.info("Chat says inventory full.");
-      inventoryFull = true;
+  private void walkToBank() {
+    if (ColourClick.isVisible(this, BANK_COLOUR)) {
+      logger.info("State: WALK_TO_BANK → BANKING");
+      state = State.BANKING;
+      stuckCounter = 0;
+      return;
+    }
+    if (!Walk.to(this, BANK_TILE, "bank")) {
+      stuckCounter++;
+      return;
+    }
+    if (ColourClick.isVisible(this, BANK_COLOUR)) {
+      logger.info("State: WALK_TO_BANK → BANKING");
+      state = State.BANKING;
+      stuckCounter = 0;
+    } else {
+      stuckCounter++;
     }
   }
 
   private void bank() {
-    // Walk to bank if not visible
-    if (!ColourClick.isVisible(this, BANK_COLOUR)) {
-      logger.info("Bank not visible, walking.");
-      if (!Walk.to(this, BANK_TILE, "bank")) {
-        stuckCounter++;
-        return;
-      }
-      if (!ColourClick.isVisible(this, BANK_COLOUR)) {
-        logger.warn("Bank still not visible after walking.");
-        stuckCounter++;
-        return;
-      }
-    }
-
-    // Open bank using ColourObj directly (Bank.open uses string-based ColourInstances lookup)
-    Point bankLoc = ColourClick.getClickPoint(this, BANK_COLOUR);
-    if (bankLoc == null) {
-      logger.error("Bank booth not found after walking.");
+    Point booth = ColourClick.getClickPoint(this, BANK_COLOUR);
+    if (booth == null) {
       stuckCounter++;
       return;
     }
-    controller().mouse().moveTo(bankLoc, "medium");
+
+    String speed = HumanBehavior.shouldSlowApproach() ? "slow" : "medium";
+    controller().mouse().moveTo(booth, speed);
+    if (HumanBehavior.shouldHesitate()) HumanBehavior.performHesitation();
+    controller().mouse().microJitter();
     controller().mouse().leftClick();
     waitMillis(HumanBehavior.adjustDelay(1200, 1800));
 
-    // Deposit all then withdraw net
     Bank.depositAll(this);
     waitMillis(HumanBehavior.adjustDelay(300, 500));
 
-    // Net is now in bank — click it in the bank tab to withdraw
-    Point netLoc = findImageInGameView(NET, INV_THRESHOLD);
-    if (netLoc != null) {
-      controller().mouse().moveTo(netLoc, "medium");
-      controller().mouse().leftClick();
-      waitMillis(HumanBehavior.adjustDelay(300, 500));
-    } else {
+    Point netLoc = Inventory.findInGameView(this, NET, THRESHOLD);
+    if (netLoc == null) {
       logger.error("Could not find net in bank to withdraw.");
       DiscordNotification.send("DraynorFishing: Lost fishing net. Stopping.");
       Bank.close(this);
       stop();
       return;
     }
+    controller().mouse().moveTo(netLoc, "medium");
+    controller().mouse().leftClick();
+    waitMillis(HumanBehavior.adjustDelay(300, 500));
 
     Bank.close(this);
-
-    // Walk back to fishing spot
-    Walk.to(this, FISHING_TILE, "fishing spot");
+    logger.info("State: BANKING → WALK_TO_FISH");
+    state = State.WALK_TO_FISH;
     stuckCounter = 0;
-    logger.info("Banked all fish.");
   }
 
-  private Point findImageInGameView(String image, double threshold) {
-    java.awt.image.BufferedImage gameView = controller().zones().getGameView();
-    return com.chromascape.utils.actions.PointSelector.getRandomPointInImage(
-        image, gameView, threshold);
+  private void walkToFish() {
+    Walk.to(this, FISHING_TILE, "fishing spot");
+    logger.info("State: WALK_TO_FISH → FISHING");
+    state = State.FISHING;
+    stuckCounter = 0;
   }
 
   private void drop() {
-    int netSlot = Inventory.findItemSlot(this, NET, INV_THRESHOLD);
+    int netSlot = Inventory.findItemSlot(this, NET, THRESHOLD);
     int[] exclude = netSlot >= 0 ? new int[]{netSlot} : new int[0];
     ItemDropper.dropAll(this, ItemDropper.DropPattern.ZIGZAG, exclude);
+    logger.info("Dropped all fish. State: DROP → FISHING");
+    state = State.FISHING;
     stuckCounter = 0;
-    logger.info("Dropped all fish.");
   }
 }
