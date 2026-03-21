@@ -185,7 +185,20 @@ public class DraynorFishingScript extends BaseScript {
     if (HumanBehavior.shouldHesitate()) HumanBehavior.performHesitation();
     controller().mouse().microJitter();
     controller().mouse().leftClick();
-    waitMillis(HumanBehavior.adjustDelay(1200, 1800));
+
+    // Poll until bank UI opens (net visible in game view) or timeout
+    Instant bankDeadline = Instant.now().plus(Duration.ofSeconds(8));
+    waitMillis(800);
+    while (Instant.now().isBefore(bankDeadline)) {
+      checkInterrupted();
+      if (Inventory.findInGameView(this, NET, THRESHOLD) != null) break;
+      waitMillis(300);
+    }
+    if (Inventory.findInGameView(this, NET, THRESHOLD) == null) {
+      logger.warn("Bank UI did not open.");
+      stuckCounter++;
+      return;
+    }
 
     Bank.depositAll(this);
     waitMillis(HumanBehavior.adjustDelay(300, 500));
