@@ -24,7 +24,7 @@ public final class Combat {
   private Combat() {}
 
   private static final ColourObj HP_BAR_GREEN =
-      new ColourObj("hpBarGreen", new Scalar(55, 200, 200, 0), new Scalar(65, 255, 255, 0));
+      new ColourObj("hpBarGreen", new Scalar(67, 230, 137, 0), new Scalar(72, 245, 145, 0));
 
   private static final Rectangle OPPONENT_INFO_ZONE = new Rectangle(5, 5, 160, 40);
 
