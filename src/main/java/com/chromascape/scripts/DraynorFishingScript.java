@@ -47,6 +47,7 @@ public class DraynorFishingScript extends BaseScript {
   private static final String RAW_SHRIMP = "/images/user/Raw_shrimps.png";
   private static final String RAW_ANCHOVY = "/images/user/Raw_anchovies.png";
   private static final String NET = "/images/user/Small_fishing_net.png";
+  private static final String[] KNOWN_ITEMS = {NET, RAW_SHRIMP, RAW_ANCHOVY};
 
   // === Colour Definitions ===
   private static final ColourObj FISHING_SPOT_COLOUR =
@@ -99,6 +100,14 @@ public class DraynorFishingScript extends BaseScript {
   }
 
   private void fish() {
+    if (Inventory.isFull(this, KNOWN_ITEMS, THRESHOLD)) {
+      State next = BANKING_ENABLED ? State.WALK_TO_BANK : State.DROP;
+      logger.info("Inventory full on entry. State: FISHING → {}", next);
+      state = next;
+      stuckCounter = 0;
+      return;
+    }
+
     if (!ColourClick.isVisible(this, FISHING_SPOT_COLOUR)) {
       logger.info("Fishing spot not visible, walking.");
       if (!Walk.to(this, FISHING_TILE, "fishing spot")) stuckCounter++;
