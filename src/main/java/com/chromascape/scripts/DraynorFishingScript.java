@@ -81,7 +81,7 @@ public class DraynorFishingScript extends BaseScript {
       return;
     }
 
-    if (!Inventory.hasItem(this, NET, THRESHOLD)) {
+    if (state != State.BANKING && !Inventory.hasItem(this, NET, THRESHOLD)) {
       logger.error("No small fishing net in inventory.");
       DiscordNotification.send("DraynorFishing: No fishing net. Stopping.");
       stop();
@@ -145,7 +145,8 @@ public class DraynorFishingScript extends BaseScript {
       waitMillis(HumanBehavior.adjustDelay(300, 500));
     }
 
-    if (Inventory.isFullByChat(this, CHAT_BLACK)) {
+    if (Inventory.isFullByChat(this, CHAT_BLACK)
+        || Inventory.isFull(this, KNOWN_ITEMS, THRESHOLD)) {
       State next = BANKING_ENABLED ? State.WALK_TO_BANK : State.DROP;
       logger.info("Inventory full. State: FISHING → {}", next);
       state = next;
@@ -203,6 +204,15 @@ public class DraynorFishingScript extends BaseScript {
     Bank.depositAll(this);
     waitMillis(HumanBehavior.adjustDelay(300, 500));
 
+    // Verify deposit worked — fish should be gone from inventory
+    if (Inventory.hasItem(this, RAW_SHRIMP, THRESHOLD)
+        || Inventory.hasItem(this, RAW_ANCHOVY, THRESHOLD)) {
+      logger.warn("Deposit failed, fish still in inventory.");
+      Bank.close(this);
+      stuckCounter++;
+      return;
+    }
+
     Point netLoc = Inventory.findInGameView(this, NET, THRESHOLD);
     if (netLoc == null) {
       logger.error("Could not find net in bank to withdraw.");
@@ -222,7 +232,10 @@ public class DraynorFishingScript extends BaseScript {
   }
 
   private void walkToFish() {
-    Walk.to(this, FISHING_TILE, "fishing spot");
+    if (!Walk.to(this, FISHING_TILE, "fishing spot")) {
+      stuckCounter++;
+      return;
+    }
     logger.info("State: WALK_TO_FISH → FISHING");
     state = State.FISHING;
     stuckCounter = 0;
