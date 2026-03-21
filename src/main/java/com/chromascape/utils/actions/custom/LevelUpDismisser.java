@@ -30,7 +30,7 @@ public class LevelUpDismisser {
 
   // "Click here to continue" is rendered in blue during active dialogs
   private static final ColourObj DIALOG_BLUE =
-      new ColourObj("dialogBlue", new Scalar(125, 200, 150, 0), new Scalar(135, 255, 255, 0));
+      new ColourObj("dialogBlue", new Scalar(118, 200, 100, 0), new Scalar(122, 255, 255, 0));
 
   /**
    * Checks the chatbox for an active dialog ("Click here to continue" in red)
