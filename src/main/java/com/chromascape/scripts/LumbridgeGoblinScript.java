@@ -51,7 +51,6 @@ public class LumbridgeGoblinScript extends BaseScript {
   // === Combat ===
   private static final int KILL_TIMEOUT_SECONDS = 20;
   private static final int MAX_ENGAGE_ATTEMPTS = 3;
-  private static final int MAX_IDLE_CHECKS = 3; // stop waiting after this many position-unchanged checks
 
   // === Tiles ===
   // Goblin area east of Lumbridge castle, across the bridge
@@ -173,31 +172,20 @@ public class LumbridgeGoblinScript extends BaseScript {
 
   // === Combat ===
 
+  private static final int ENGAGE_TIMEOUT_SECONDS = 8;
+
   /**
-   * Waits for the first XP gain after clicking a goblin. Keeps waiting while the player is still
-   * moving (pathing to the target). Only gives up after the player has been stationary for
-   * MAX_IDLE_CHECKS consecutive polls with no XP gain.
+   * Waits for combat to start after clicking a goblin. Polls the opponent health bar
+   * and XP gain, allowing enough time for the player to path to the target.
    */
   private boolean waitForFirstHit(int previousXp) {
-    int idleCount = 0;
-    Tile lastPos = null;
-    while (idleCount < MAX_IDLE_CHECKS) {
+    long deadline = System.currentTimeMillis() + (ENGAGE_TIMEOUT_SECONDS * 1000L);
+    while (System.currentTimeMillis() < deadline) {
+      if (Combat.isInCombat(this)) return true;
       try {
         if (Minimap.getXp(this) > previousXp) return true;
       } catch (Exception ignored) {}
-      if (Combat.isInCombat(this)) return true;
-      try {
-        Tile pos = controller().walker().getPlayerPosition();
-        if (lastPos != null && pos.x() == lastPos.x() && pos.y() == lastPos.y()) {
-          idleCount++;
-        } else {
-          idleCount = 0;
-        }
-        lastPos = pos;
-      } catch (Exception e) {
-        idleCount++;
-      }
-      waitMillis(600);
+      waitMillis(300);
     }
     return false;
   }
