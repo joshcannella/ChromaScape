@@ -24,7 +24,8 @@ import org.bytedeco.opencv.opencv_core.Scalar;
 /**
  * Fly fishes trout/salmon at Barbarian Village, cooks on the permanent fire, banks at Edgeville.
  *
- * <p><b>Flow:</b> FISH → COOK_TROUT → COOK_SALMON → DROP_BURNT → BANK → repeat
+ * <p><b>Flow:</b> FISH → COOK_TROUT → COOK_SALMON → DROP_BURNT → WALK_TO_BANK → BANKING →
+ * WALK_TO_FISH → repeat
  *
  * <p><b>RuneLite Setup:</b>
  * <ul>
@@ -45,9 +46,13 @@ public class BarbFishCookScript extends BaseScript {
   // === Templates ===
   private static final String RAW_TROUT = "/images/user/Raw_trout.png";
   private static final String RAW_SALMON = "/images/user/Raw_salmon.png";
+  private static final String COOKED_TROUT = "/images/user/Trout.png";
+  private static final String COOKED_SALMON = "/images/user/Salmon.png";
   private static final String BURNT_FISH = "/images/user/Burnt_fish.png";
   private static final String ROD = "/images/user/Fly_fishing_rod.png";
   private static final String FEATHER = "/images/user/Feather.png";
+  private static final String[] KNOWN_ITEMS =
+      {ROD, FEATHER, RAW_TROUT, RAW_SALMON, COOKED_TROUT, COOKED_SALMON, BURNT_FISH};
 
   // === Colours ===
   private static final ColourObj SPOT_COLOUR =
@@ -82,17 +87,20 @@ public class BarbFishCookScript extends BaseScript {
       return;
     }
 
-    if (!Inventory.hasItem(this, ROD, THRESHOLD)) {
-      logger.error("No fly fishing rod.");
-      DiscordNotification.send("BarbFishCook: No rod. Stopping.");
-      stop();
-      return;
-    }
-    if (!Inventory.hasItem(this, FEATHER, THRESHOLD)) {
-      logger.error("No feathers.");
-      DiscordNotification.send("BarbFishCook: No feathers. Stopping.");
-      stop();
-      return;
+    // Tool guards — skip during BANKING when tools are deposited
+    if (state != State.BANKING) {
+      if (!Inventory.hasItem(this, ROD, THRESHOLD)) {
+        logger.error("No fly fishing rod.");
+        DiscordNotification.send("BarbFishCook: No rod. Stopping.");
+        stop();
+        return;
+      }
+      if (!Inventory.hasItem(this, FEATHER, THRESHOLD)) {
+        logger.error("No feathers.");
+        DiscordNotification.send("BarbFishCook: No feathers. Stopping.");
+        stop();
+        return;
+      }
     }
 
     logger.info("State: {} | Stuck: {}", state, stuckCounter);
@@ -109,6 +117,15 @@ public class BarbFishCookScript extends BaseScript {
   }
 
   private void fish() {
+    // Check full inventory on entry (handles starting with full inv)
+    if (Inventory.isFullByChat(this, CHAT_BLACK)
+        || Inventory.isFull(this, KNOWN_ITEMS, THRESHOLD)) {
+      logger.info("Inventory full. State: FISHING → COOK_TROUT");
+      state = State.COOK_TROUT;
+      stuckCounter = 0;
+      return;
+    }
+
     if (!ColourClick.isVisible(this, SPOT_COLOUR)) {
       logger.info("Spot not visible, walking.");
       if (!Walk.to(this, FISHING_TILE, "fishing spot")) stuckCounter++;
@@ -118,35 +135,45 @@ public class BarbFishCookScript extends BaseScript {
     Point spot = ColourClick.getClickPoint(this, SPOT_COLOUR, 10.0);
     if (spot == null) { stuckCounter++; return; }
 
-    controller().mouse().moveTo(spot, "medium");
+    String speed = HumanBehavior.shouldSlowApproach() ? "slow" : "medium";
+    controller().mouse().moveTo(spot, speed);
+    if (HumanBehavior.shouldHesitate()) HumanBehavior.performHesitation();
+    if (HumanBehavior.shouldMisclick()) {
+      HumanBehavior.performMisclick(this, spot);
+      controller().mouse().moveTo(spot, "medium");
+    }
+    controller().mouse().microJitter();
     controller().mouse().leftClick();
 
-    // Poll: break on idle OR spot disappearing (moved)
     Instant deadline = Instant.now().plus(Duration.ofSeconds(120));
     waitMillis(600);
     while (Instant.now().isBefore(deadline)) {
       checkInterrupted();
       if (Idler.waitUntilIdle(this, 3)) break;
       if (!ColourClick.isVisible(this, SPOT_COLOUR)) break;
+      waitMillis(300);
     }
 
-    LevelUpDismisser.dismissIfPresent(this);
+    waitMillis(HumanBehavior.adjustDelay(300, 500));
+    if (LevelUpDismisser.dismissIfPresent(this)) {
+      waitMillis(HumanBehavior.adjustDelay(300, 500));
+    }
 
-    if (Inventory.isFullByChat(this, CHAT_BLACK)) {
-      logger.info("Inventory full, cooking.");
+    if (Inventory.isFullByChat(this, CHAT_BLACK)
+        || Inventory.isFull(this, KNOWN_ITEMS, THRESHOLD)) {
+      logger.info("Inventory full. State: FISHING → COOK_TROUT");
       state = State.COOK_TROUT;
+      stuckCounter = 0;
     }
-    stuckCounter = 0;
   }
 
   private void cookFish(String rawTemplate, State nextState) {
-    // Skip if none of this fish type
     if (!Inventory.hasItem(this, rawTemplate, THRESHOLD)) {
+      logger.info("No {} left. State: → {}", rawTemplate, nextState);
       state = nextState;
       return;
     }
 
-    // Walk to fire if not visible
     if (!ColourClick.isVisible(this, FIRE_COLOUR)) {
       logger.info("Fire not visible, walking.");
       if (!Walk.to(this, FIRE_TILE, "fire")) { stuckCounter++; return; }
@@ -159,33 +186,48 @@ public class BarbFishCookScript extends BaseScript {
 
     Point fire = ColourClick.getClickPoint(this, FIRE_COLOUR);
     if (fire == null) { stuckCounter++; return; }
-    controller().mouse().moveTo(fire, "medium");
+
+    String speed = HumanBehavior.shouldSlowApproach() ? "slow" : "medium";
+    controller().mouse().moveTo(fire, speed);
+    if (HumanBehavior.shouldHesitate()) HumanBehavior.performHesitation();
+    controller().mouse().microJitter();
     controller().mouse().leftClick();
 
-    // Cooking interface → space → wait
-    waitMillis(HumanBehavior.adjustDelay(1100, 1400));
+    // Poll for cooking interface to open (wait for "Cook" text or just a longer adaptive wait)
+    waitMillis(HumanBehavior.adjustDelay(1400, 1800));
     KeyPress.space(this);
     Idler.waitUntilIdle(this, 120);
-    LevelUpDismisser.dismissIfPresent(this);
 
-    // Advance only when all of this type are cooked (level-up may have interrupted)
-    if (!Inventory.hasItem(this, rawTemplate, THRESHOLD)) {
-      state = nextState;
+    waitMillis(HumanBehavior.adjustDelay(300, 500));
+    if (LevelUpDismisser.dismissIfPresent(this)) {
+      waitMillis(HumanBehavior.adjustDelay(300, 500));
     }
-    stuckCounter = 0;
+
+    if (!Inventory.hasItem(this, rawTemplate, THRESHOLD)) {
+      logger.info("All {} cooked. State: → {}", rawTemplate, nextState);
+      state = nextState;
+      stuckCounter = 0;
+    }
   }
 
   private void dropBurnt() {
     if (!Inventory.hasItem(this, BURNT_FISH, THRESHOLD)) {
+      logger.info("No burnt fish. State: DROP_BURNT → WALK_TO_BANK");
       state = State.WALK_TO_BANK;
       return;
     }
 
     controller().keyboard().sendModifierKey(401, "shift");
     waitMillis(HumanBehavior.adjustDelay(80, 150));
+    Instant deadline = Instant.now().plus(Duration.ofSeconds(30));
     try {
       int slot;
       while ((slot = Inventory.findItemSlot(this, BURNT_FISH, THRESHOLD)) >= 0) {
+        checkInterrupted();
+        if (Instant.now().isAfter(deadline)) {
+          logger.warn("Drop loop timed out.");
+          break;
+        }
         Rectangle rect = controller().zones().getInventorySlots().get(slot);
         controller().mouse().moveTo(ClickDistribution.generateRandomPoint(rect), "fast");
         controller().mouse().leftClick();
@@ -195,15 +237,23 @@ public class BarbFishCookScript extends BaseScript {
       controller().keyboard().sendModifierKey(402, "shift");
     }
 
+    logger.info("State: DROP_BURNT → WALK_TO_BANK");
     state = State.WALK_TO_BANK;
     stuckCounter = 0;
   }
 
   private void walkToBank() {
-    if (ColourClick.isVisible(this, BANK_COLOUR)) { state = State.BANKING; return; }
+    if (ColourClick.isVisible(this, BANK_COLOUR)) {
+      logger.info("State: WALK_TO_BANK → BANKING");
+      state = State.BANKING;
+      stuckCounter = 0;
+      return;
+    }
     if (!Walk.to(this, BANK_TILE, "bank")) { stuckCounter++; return; }
     if (ColourClick.isVisible(this, BANK_COLOUR)) {
+      logger.info("State: WALK_TO_BANK → BANKING");
       state = State.BANKING;
+      stuckCounter = 0;
     } else {
       stuckCounter++;
     }
@@ -213,38 +263,47 @@ public class BarbFishCookScript extends BaseScript {
     Point booth = ColourClick.getClickPoint(this, BANK_COLOUR);
     if (booth == null) { stuckCounter++; return; }
 
-    controller().mouse().moveTo(booth, "medium");
+    String speed = HumanBehavior.shouldSlowApproach() ? "slow" : "medium";
+    controller().mouse().moveTo(booth, speed);
+    if (HumanBehavior.shouldHesitate()) HumanBehavior.performHesitation();
+    controller().mouse().microJitter();
     controller().mouse().leftClick();
-    waitMillis(HumanBehavior.adjustDelay(1200, 1800));
 
-    Bank.depositAll(this);
-    waitMillis(HumanBehavior.adjustDelay(300, 500));
+    // Poll until bank UI opens (rod visible in game view)
+    Instant bankDeadline = Instant.now().plus(Duration.ofSeconds(8));
+    waitMillis(800);
+    while (Instant.now().isBefore(bankDeadline)) {
+      checkInterrupted();
+      if (Inventory.findInGameView(this, ROD, THRESHOLD) != null) break;
+      waitMillis(300);
+    }
+    if (Inventory.findInGameView(this, ROD, THRESHOLD) == null) {
+      logger.warn("Bank UI did not open.");
+      stuckCounter++;
+      return;
+    }
 
-    if (!withdrawItem(ROD, "rod") || !withdrawItem(FEATHER, "feathers")) return;
+    // Deposit fish items only — keep rod and feathers
+    for (String fish : new String[]{RAW_TROUT, RAW_SALMON, COOKED_TROUT, COOKED_SALMON,
+        BURNT_FISH}) {
+      while (Inventory.hasItem(this, fish, THRESHOLD)) {
+        if (!Inventory.clickItem(this, fish, THRESHOLD, "medium")) break;
+        waitMillis(HumanBehavior.adjustDelay(300, 500));
+      }
+    }
 
     Bank.close(this);
+    logger.info("State: BANKING → WALK_TO_FISH");
     state = State.WALK_TO_FISH;
     stuckCounter = 0;
-    logger.info("Banked all fish.");
-  }
-
-  private boolean withdrawItem(String template, String name) {
-    Point loc = Inventory.findInGameView(this, template, THRESHOLD);
-    if (loc == null) {
-      logger.error("{} not found in bank.", name);
-      DiscordNotification.send("BarbFishCook: Lost " + name + ". Stopping.");
-      Bank.close(this);
-      stop();
-      return false;
-    }
-    controller().mouse().moveTo(loc, "medium");
-    controller().mouse().leftClick();
-    waitMillis(HumanBehavior.adjustDelay(300, 500));
-    return true;
   }
 
   private void walkToFish() {
-    Walk.to(this, FISHING_TILE, "fishing spot");
+    if (!Walk.to(this, FISHING_TILE, "fishing spot")) {
+      stuckCounter++;
+      return;
+    }
+    logger.info("State: WALK_TO_FISH → FISHING");
     state = State.FISHING;
     stuckCounter = 0;
   }
