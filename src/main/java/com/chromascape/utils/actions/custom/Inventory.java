@@ -1,9 +1,12 @@
 package com.chromascape.utils.actions.custom;
 
 import com.chromascape.base.BaseScript;
+import com.chromascape.utils.actions.PointSelector;
 import com.chromascape.utils.core.input.distribution.ClickDistribution;
+import com.chromascape.utils.core.screen.colour.ColourObj;
 import com.chromascape.utils.core.screen.topology.TemplateMatching;
 import com.chromascape.utils.core.screen.window.ScreenManager;
+import com.chromascape.utils.domain.ocr.Ocr;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
@@ -18,6 +21,8 @@ import org.apache.logging.log4j.Logger;
  * if (Inventory.hasItem(this, ITEM_IMAGE, 0.07)) { ... }
  * int count = Inventory.countItem(this, ITEM_IMAGE, 0.07);
  * Inventory.clickItem(this, ITEM_IMAGE, 0.07, "medium");
+ * Point loc = Inventory.findInGameView(this, ITEM_IMAGE, 0.07);  // bank withdrawals
+ * boolean full = Inventory.isFullByChat(this, CHAT_BLACK);
  * </pre>
  */
 public class Inventory {
@@ -124,5 +129,34 @@ public class Inventory {
       }
     }
     return true;
+  }
+
+  /**
+   * Finds an item by template anywhere in the game view (not just inventory slots).
+   * Useful for clicking items in the bank interface after deposit-all.
+   *
+   * @param base the active script instance
+   * @param templatePath classpath path to the item image
+   * @param threshold matching threshold
+   * @return a random point within the matched region, or null if not found
+   */
+  public static Point findInGameView(BaseScript base, String templatePath, double threshold) {
+    BufferedImage gameView = base.controller().zones().getGameView();
+    return PointSelector.getRandomPointInImage(templatePath, gameView, threshold);
+  }
+
+  /**
+   * Checks if the inventory is full by reading the chatbox for "can't carry" or "full".
+   * Requires the chat tab to be visible and Idle Notifier plugin enabled.
+   *
+   * @param base the active script instance
+   * @param chatColour the colour to OCR against (typically black for standard chat text)
+   * @return true if chat indicates inventory is full
+   */
+  public static boolean isFullByChat(BaseScript base, ColourObj chatColour) {
+    Rectangle chat = base.controller().zones().getChatTabs().get("Chat");
+    if (chat == null) return false;
+    String text = Ocr.extractText(chat, "Plain 12", chatColour, true).toLowerCase();
+    return text.contains("can't carry") || text.contains("full");
   }
 }
