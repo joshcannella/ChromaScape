@@ -7,6 +7,8 @@ import com.chromascape.utils.core.screen.topology.ColourContours;
 import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 import java.util.List;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.bytedeco.opencv.opencv_core.Scalar;
 
 /**
@@ -21,6 +23,8 @@ import org.bytedeco.opencv.opencv_core.Scalar;
 public final class Combat {
 
   private Combat() {}
+
+  private static final Logger logger = LogManager.getLogger(Combat.class);
 
   private static final ColourObj HP_BAR_GREEN =
       new ColourObj("hpBarGreen", new Scalar(67, 230, 137, 0), new Scalar(72, 245, 145, 0));
@@ -39,6 +43,7 @@ public final class Combat {
         OPPONENT_INFO_ZONE.width, OPPONENT_INFO_ZONE.height);
     List<ChromaObj> objs = ColourContours.getChromaObjsInColour(zone, HP_BAR_GREEN);
     boolean found = !objs.isEmpty();
+    logger.info("isInCombat={} (contours={})", found, objs.size());
     for (ChromaObj obj : objs) {
       obj.release();
     }
