@@ -26,14 +26,22 @@ public final class Combat {
   private static final ColourObj HP_BAR_GREEN =
       new ColourObj("hpBarGreen", new Scalar(67, 230, 137, 0), new Scalar(72, 245, 145, 0));
 
+  private static final ColourObj HP_BAR_RED =
+      new ColourObj("hpBarRed", new Scalar(0, 197, 97, 0), new Scalar(1, 217, 99, 0));
+
   private static final Rectangle OPPONENT_INFO_ZONE = new Rectangle(5, 5, 160, 40);
 
   /**
    * Returns true if the Opponent Information health bar is visible (player is in combat).
+   * Checks for both the green (remaining HP) and red (missing HP) portions.
    */
   public static boolean isInCombat(BaseScript base) {
     BufferedImage zone = ScreenManager.captureZone(OPPONENT_INFO_ZONE);
-    List<ChromaObj> objs = ColourContours.getChromaObjsInColour(zone, HP_BAR_GREEN);
+    return hasColour(zone, HP_BAR_GREEN) || hasColour(zone, HP_BAR_RED);
+  }
+
+  private static boolean hasColour(BufferedImage image, ColourObj colour) {
+    List<ChromaObj> objs = ColourContours.getChromaObjsInColour(image, colour);
     boolean found = !objs.isEmpty();
     for (ChromaObj obj : objs) {
       obj.release();
