@@ -201,13 +201,21 @@ public class DraynorFishingScript extends BaseScript {
       return;
     }
 
-    // Deposit fish only (left-click deposits all of that item type)
-    for (String fish : new String[]{RAW_SHRIMP, RAW_ANCHOVY}) {
-      while (Inventory.hasItem(this, fish, THRESHOLD)) {
-        if (!Inventory.clickItem(this, fish, THRESHOLD, "medium")) break;
-        waitMillis(HumanBehavior.adjustDelay(300, 500));
-      }
+    // Deposit all then withdraw net back
+    Bank.depositAll(this);
+    waitMillis(HumanBehavior.adjustDelay(300, 500));
+
+    Point netLoc = Inventory.findInGameView(this, NET, THRESHOLD);
+    if (netLoc == null) {
+      logger.error("Could not find net in bank to withdraw.");
+      DiscordNotification.send("DraynorFishing: Lost fishing net. Stopping.");
+      Bank.close(this);
+      stop();
+      return;
     }
+    controller().mouse().moveTo(netLoc, "medium");
+    controller().mouse().leftClick();
+    waitMillis(HumanBehavior.adjustDelay(300, 500));
 
     Bank.close(this);
     logger.info("State: BANKING → WALK_TO_FISH");

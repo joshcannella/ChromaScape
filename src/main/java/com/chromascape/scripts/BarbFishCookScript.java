@@ -283,13 +283,22 @@ public class BarbFishCookScript extends BaseScript {
       return;
     }
 
-    // Deposit fish items only — keep rod and feathers
-    for (String fish : new String[]{RAW_TROUT, RAW_SALMON, COOKED_TROUT, COOKED_SALMON,
-        BURNT_FISH}) {
-      while (Inventory.hasItem(this, fish, THRESHOLD)) {
-        if (!Inventory.clickItem(this, fish, THRESHOLD, "medium")) break;
-        waitMillis(HumanBehavior.adjustDelay(300, 500));
+    // Deposit all then withdraw rod and feathers back
+    Bank.depositAll(this);
+    waitMillis(HumanBehavior.adjustDelay(300, 500));
+
+    for (String[] tool : new String[][]{{ROD, "rod"}, {FEATHER, "feathers"}}) {
+      Point loc = Inventory.findInGameView(this, tool[0], THRESHOLD);
+      if (loc == null) {
+        logger.error("{} not found in bank.", tool[1]);
+        DiscordNotification.send("BarbFishCook: Lost " + tool[1] + ". Stopping.");
+        Bank.close(this);
+        stop();
+        return;
       }
+      controller().mouse().moveTo(loc, "medium");
+      controller().mouse().leftClick();
+      waitMillis(HumanBehavior.adjustDelay(300, 500));
     }
 
     Bank.close(this);
