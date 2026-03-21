@@ -7,6 +7,7 @@ import com.chromascape.utils.actions.IdleType;
 import com.chromascape.utils.actions.Minimap;
 import com.chromascape.utils.actions.MovingObject;
 import com.chromascape.utils.actions.custom.ColourClick;
+import com.chromascape.utils.actions.custom.Combat;
 import com.chromascape.utils.actions.custom.HumanBehavior;
 import com.chromascape.utils.actions.custom.Inventory;
 import com.chromascape.utils.actions.custom.Walk;
@@ -73,8 +74,9 @@ public class LumbridgeGoblinScript extends BaseScript {
     }
     if (HumanBehavior.runPreCycleChecks(this)) return;
 
-    // Check if we just left combat via idle detection
+    // Check if we just left combat via health bar + idle detection
     if (inCombat) {
+      if (Combat.isInCombat(this)) return; // health bar still up, skip cycle
       IdleType idleType = Idler.waitUntilIdleType(this, 1);
       if (idleType != IdleType.TIMEOUT) {
         logger.info("Combat ended ({})", idleType);
@@ -183,6 +185,7 @@ public class LumbridgeGoblinScript extends BaseScript {
       try {
         if (Minimap.getXp(this) > previousXp) return true;
       } catch (Exception ignored) {}
+      if (Combat.isInCombat(this)) return true;
       try {
         Tile pos = controller().walker().getPlayerPosition();
         if (lastPos != null && pos.x() == lastPos.x() && pos.y() == lastPos.y()) {
@@ -225,10 +228,14 @@ public class LumbridgeGoblinScript extends BaseScript {
           return;
         }
         case ANIMATION -> {
+          if (!Combat.isInCombat(this)) { inCombat = false; logger.info("Kill confirmed (health bar gone)"); HumanBehavior.sleep(600, 900); return; }
           logger.debug("Animation idle mid-combat, continuing to wait");
           if (shouldEat()) eatFood();
         }
-        case MOVEMENT -> logger.debug("Movement idle mid-combat, continuing to wait");
+        case MOVEMENT -> {
+          if (!Combat.isInCombat(this)) { inCombat = false; logger.info("Kill confirmed (health bar gone)"); HumanBehavior.sleep(600, 900); return; }
+          logger.debug("Movement idle mid-combat, continuing to wait");
+        }
       }
     }
   }
