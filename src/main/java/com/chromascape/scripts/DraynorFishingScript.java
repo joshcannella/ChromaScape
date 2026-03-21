@@ -139,7 +139,11 @@ public class DraynorFishingScript extends BaseScript {
       waitMillis(300);
     }
 
-    LevelUpDismisser.dismissIfPresent(this);
+    waitMillis(HumanBehavior.adjustDelay(300, 500));
+    if (LevelUpDismisser.dismissIfPresent(this)) {
+      logger.info("Dismissed level-up dialog.");
+      waitMillis(HumanBehavior.adjustDelay(300, 500));
+    }
 
     if (Inventory.isFullByChat(this, CHAT_BLACK)) {
       State next = BANKING_ENABLED ? State.WALK_TO_BANK : State.DROP;
