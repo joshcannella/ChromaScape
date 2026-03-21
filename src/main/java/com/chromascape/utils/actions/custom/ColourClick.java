@@ -5,7 +5,10 @@ import com.chromascape.utils.core.input.distribution.ClickDistribution;
 import com.chromascape.utils.core.screen.colour.ColourObj;
 import com.chromascape.utils.core.screen.topology.ChromaObj;
 import com.chromascape.utils.core.screen.topology.ColourContours;
+import com.chromascape.utils.core.screen.topology.TemplateMatching;
+import com.chromascape.utils.core.screen.window.ScreenManager;
 import java.awt.Point;
+import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 import java.util.List;
 import org.apache.logging.log4j.LogManager;
@@ -26,6 +29,12 @@ public final class ColourClick {
   private static final Logger logger = LogManager.getLogger(ColourClick.class);
 
   private ColourClick() {}
+
+  private static final int PADDING = 7;
+  private static final String[] RED_CLICK_IMAGES = {
+    "/images/mouse_clicks/red_1.png", "/images/mouse_clicks/red_2.png",
+    "/images/mouse_clicks/red_3.png", "/images/mouse_clicks/red_4.png"
+  };
 
   /**
    * Checks if any object of the given colour is visible in the game view.
@@ -71,5 +80,19 @@ public final class ColourClick {
         obj.release();
       }
     }
+  }
+
+  /**
+   * Checks if a red click (interaction) sprite appeared at the given point.
+   * Call ~120ms after clicking to allow the sprite to render.
+   */
+  public static boolean wasRedClick(Point clickPoint) {
+    Rectangle area = new Rectangle(
+        clickPoint.x - PADDING, clickPoint.y - PADDING, PADDING * 2, PADDING * 2);
+    BufferedImage capture = ScreenManager.captureZone(area);
+    for (String sprite : RED_CLICK_IMAGES) {
+      if (TemplateMatching.match(sprite, capture, 0.15).success()) return true;
+    }
+    return false;
   }
 }

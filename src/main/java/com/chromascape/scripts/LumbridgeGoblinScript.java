@@ -127,6 +127,11 @@ public class LumbridgeGoblinScript extends BaseScript {
       }
       controller().mouse().moveTo(goblin, "fast");
       controller().mouse().leftClick();
+      waitMillis(120);
+      if (!ColourClick.wasRedClick(goblin)) {
+        logger.warn("No red click on goblin (attempt {})", attempt + 1);
+        continue;
+      }
       if (waitForFirstHit(previousXp)) {
         stuckCounter = 0;
         inCombat = true;
