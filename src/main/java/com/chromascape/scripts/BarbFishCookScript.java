@@ -27,7 +27,7 @@ import org.bytedeco.opencv.opencv_core.Scalar;
 /**
  * Fly fishes trout/salmon at Barbarian Village, cooks on the permanent fire, banks at Edgeville.
  *
- * <p><b>Flow:</b> FISH → COOKING → DROP_BURNT → WALK_TO_BANK → BANKING →
+ * <p><b>Flow:</b> FISH → COOKING → WALK_TO_BANK (drop burnt while walking) → BANKING →
  * WALK_TO_FISH → repeat
  *
  * <p><b>RuneLite Setup:</b>
@@ -44,7 +44,7 @@ public class BarbFishCookScript extends BaseScript {
   private static final Logger logger = LogManager.getLogger(BarbFishCookScript.class);
 
   private enum State {
-    FISHING, COOKING, DROP_BURNT, WALK_TO_BANK, BANKING, WALK_TO_FISH
+    FISHING, COOKING, WALK_TO_BANK, BANKING, WALK_TO_FISH
   }
 
   // === Templates ===
@@ -113,7 +113,7 @@ public class BarbFishCookScript extends BaseScript {
     switch (state) {
       case FISHING -> fish();
       case COOKING -> cook();
-      case DROP_BURNT -> dropBurnt();
+      case WALK_TO_BANK -> walkToBank();
       case WALK_TO_BANK -> walkToBank();
       case BANKING -> bank();
       case WALK_TO_FISH -> walkToFish();
@@ -171,8 +171,8 @@ public class BarbFishCookScript extends BaseScript {
     boolean hasRaw = Inventory.hasItem(this, RAW_TROUT, THRESHOLD)
         || Inventory.hasItem(this, RAW_SALMON, THRESHOLD);
     if (!hasRaw) {
-      logger.info("No raw fish. State: COOKING → DROP_BURNT");
-      state = State.DROP_BURNT;
+      logger.info("No raw fish. State: COOKING → WALK_TO_BANK");
+      state = State.WALK_TO_BANK;
       stuckCounter = 0;
       return;
     }
@@ -220,29 +220,19 @@ public class BarbFishCookScript extends BaseScript {
       }
     }
 
-    logger.info("State: COOKING → DROP_BURNT");
-    state = State.DROP_BURNT;
+    logger.info("State: COOKING → WALK_TO_BANK");
+    state = State.WALK_TO_BANK;
     stuckCounter = 0;
   }
 
-  private void dropBurnt() {
-    if (!Inventory.hasItem(this, BURNT_FISH, BURNT_THRESHOLD)) {
-      logger.info("No burnt fish. State: DROP_BURNT → WALK_TO_BANK");
-      state = State.WALK_TO_BANK;
-      return;
-    }
-
+  private void dropBurntWhileWalking() {
+    if (!Inventory.hasItem(this, BURNT_FISH, BURNT_THRESHOLD)) return;
     controller().keyboard().sendModifierKey(401, "shift");
     waitMillis(HumanBehavior.adjustDelay(80, 150));
-    Instant deadline = Instant.now().plus(Duration.ofSeconds(30));
     try {
       int slot;
       while ((slot = Inventory.findItemSlot(this, BURNT_FISH, BURNT_THRESHOLD)) >= 0) {
         checkInterrupted();
-        if (Instant.now().isAfter(deadline)) {
-          logger.warn("Drop loop timed out.");
-          break;
-        }
         Rectangle rect = controller().zones().getInventorySlots().get(slot);
         controller().mouse().moveTo(ClickDistribution.generateRandomPoint(rect), "fast");
         controller().mouse().leftClick();
@@ -251,10 +241,6 @@ public class BarbFishCookScript extends BaseScript {
     } finally {
       controller().keyboard().sendModifierKey(402, "shift");
     }
-
-    logger.info("State: DROP_BURNT → WALK_TO_BANK");
-    state = State.WALK_TO_BANK;
-    stuckCounter = 0;
   }
 
   private void walkToBank() {
@@ -264,7 +250,8 @@ public class BarbFishCookScript extends BaseScript {
       stuckCounter = 0;
       return;
     }
-    if (!Walk.to(this, BANK_TILE, "bank")) { stuckCounter++; return; }
+    Walk.to(this, BANK_TILE, "bank");
+    dropBurntWhileWalking();
     if (ColourClick.isVisible(this, BANK_COLOUR)) {
       logger.info("State: WALK_TO_BANK → BANKING");
       state = State.BANKING;
