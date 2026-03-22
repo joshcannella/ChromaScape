@@ -11,7 +11,6 @@ import com.chromascape.utils.actions.custom.KeyPress;
 import com.chromascape.utils.actions.custom.LevelUpDismisser;
 import com.chromascape.utils.actions.custom.Logout;
 import com.chromascape.utils.actions.custom.Walk;
-import com.chromascape.utils.core.input.distribution.ClickDistribution;
 import com.chromascape.utils.core.screen.colour.ColourObj;
 import com.chromascape.utils.core.screen.topology.TemplateMatching;
 import com.chromascape.utils.core.screen.window.ScreenManager;
@@ -27,8 +26,7 @@ import org.bytedeco.opencv.opencv_core.Scalar;
 /**
  * Fly fishes trout/salmon at Barbarian Village, cooks on the permanent fire, banks at Edgeville.
  *
- * <p><b>Flow:</b> FISH → COOKING → WALK_TO_BANK (drop burnt while walking) → BANKING →
- * WALK_TO_FISH → repeat
+ * <p><b>Flow:</b> FISH → COOKING → WALK_TO_BANK → BANKING → WALK_TO_FISH → repeat
  *
  * <p><b>RuneLite Setup:</b>
  * <ul>
@@ -50,16 +48,9 @@ public class BarbFishCookScript extends BaseScript {
   // === Templates ===
   private static final String RAW_TROUT = "/images/user/Raw_trout.png";
   private static final String RAW_SALMON = "/images/user/Raw_salmon.png";
-  private static final String COOKED_TROUT = "/images/user/Trout.png";
-  private static final String COOKED_SALMON = "/images/user/Salmon.png";
-  private static final String BURNT_FISH = "/images/user/Burnt_fish.png";
-  private static final double BURNT_THRESHOLD = 0.04;
   private static final String ROD = "/images/user/Fly_fishing_rod.png";
   private static final String FEATHER = "/images/user/Feather.png";
   private static final String FEATHER_STACK = "/images/user/Feather_stack.png";
-  private static final String[] KNOWN_ITEMS =
-      {ROD, FEATHER, FEATHER_STACK, RAW_TROUT, RAW_SALMON, COOKED_TROUT, COOKED_SALMON,
-          BURNT_FISH};
 
   // === Colours ===
   private static final ColourObj SPOT_COLOUR =
@@ -224,24 +215,6 @@ public class BarbFishCookScript extends BaseScript {
     stuckCounter = 0;
   }
 
-  private void dropBurntWhileWalking() {
-    if (!Inventory.hasItem(this, BURNT_FISH, BURNT_THRESHOLD)) return;
-    controller().keyboard().sendModifierKey(401, "shift");
-    waitMillis(HumanBehavior.adjustDelay(80, 150));
-    try {
-      int slot;
-      while ((slot = Inventory.findItemSlot(this, BURNT_FISH, BURNT_THRESHOLD)) >= 0) {
-        checkInterrupted();
-        Rectangle rect = controller().zones().getInventorySlots().get(slot);
-        controller().mouse().moveTo(ClickDistribution.generateRandomPoint(rect), "fast");
-        controller().mouse().leftClick();
-        waitMillis(HumanBehavior.adjustDelay(40, 90));
-      }
-    } finally {
-      controller().keyboard().sendModifierKey(402, "shift");
-    }
-  }
-
   private void walkToBank() {
     if (ColourClick.isVisible(this, BANK_COLOUR)) {
       logger.info("State: WALK_TO_BANK → BANKING");
@@ -250,7 +223,6 @@ public class BarbFishCookScript extends BaseScript {
       return;
     }
     Walk.to(this, BANK_TILE, "bank");
-    dropBurntWhileWalking();
     if (ColourClick.isVisible(this, BANK_COLOUR)) {
       logger.info("State: WALK_TO_BANK → BANKING");
       state = State.BANKING;
