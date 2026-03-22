@@ -3,6 +3,7 @@ package com.chromascape.scripts;
 import com.chromascape.api.DiscordNotification;
 import com.chromascape.base.BaseScript;
 import com.chromascape.utils.actions.Idler;
+import com.chromascape.utils.actions.ItemDropper;
 import com.chromascape.utils.actions.custom.Bank;
 import com.chromascape.utils.actions.custom.ColourClick;
 import com.chromascape.utils.actions.custom.HumanBehavior;
@@ -42,7 +43,7 @@ public class BarbFishCookScript extends BaseScript {
   private static final Logger logger = LogManager.getLogger(BarbFishCookScript.class);
 
   private enum State {
-    FISHING, COOKING, WALK_TO_BANK, BANKING, WALK_TO_FISH
+    FISHING, COOKING, DROPPING, WALK_TO_BANK, BANKING, WALK_TO_FISH
   }
 
   // === Templates ===
@@ -67,6 +68,9 @@ public class BarbFishCookScript extends BaseScript {
 
   private static final double THRESHOLD = 0.07;
   private static final int MAX_STUCK_CYCLES = 10;
+
+  /** When true, drop all fish after cooking instead of banking. */
+  private static final boolean DROP_AFTER_COOK = false;
 
   private State state = State.FISHING;
   private int stuckCounter = 0;
@@ -104,6 +108,7 @@ public class BarbFishCookScript extends BaseScript {
     switch (state) {
       case FISHING -> fish();
       case COOKING -> cook();
+      case DROPPING -> dropFish();
       case WALK_TO_BANK -> walkToBank();
       case BANKING -> bank();
       case WALK_TO_FISH -> walkToFish();
@@ -161,8 +166,8 @@ public class BarbFishCookScript extends BaseScript {
     boolean hasRaw = Inventory.hasItem(this, RAW_TROUT, THRESHOLD)
         || Inventory.hasItem(this, RAW_SALMON, THRESHOLD);
     if (!hasRaw) {
-      logger.info("No raw fish. State: COOKING → WALK_TO_BANK");
-      state = State.WALK_TO_BANK;
+      state = DROP_AFTER_COOK ? State.DROPPING : State.WALK_TO_BANK;
+      logger.info("No raw fish. State: COOKING → {}", state);
       stuckCounter = 0;
       return;
     }
@@ -210,8 +215,15 @@ public class BarbFishCookScript extends BaseScript {
       }
     }
 
-    logger.info("State: COOKING → WALK_TO_BANK");
-    state = State.WALK_TO_BANK;
+    state = DROP_AFTER_COOK ? State.DROPPING : State.WALK_TO_BANK;
+    logger.info("State: COOKING → {}", state);
+    stuckCounter = 0;
+  }
+
+  private void dropFish() {
+    ItemDropper.dropAll(this, ItemDropper.DropPattern.ZIGZAG, new int[]{0, 1});
+    logger.info("State: DROPPING → WALK_TO_FISH");
+    state = State.WALK_TO_FISH;
     stuckCounter = 0;
   }
 
