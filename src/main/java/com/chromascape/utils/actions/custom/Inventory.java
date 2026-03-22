@@ -4,14 +4,17 @@ import com.chromascape.base.BaseScript;
 import com.chromascape.utils.actions.PointSelector;
 import com.chromascape.utils.core.input.distribution.ClickDistribution;
 import com.chromascape.utils.core.screen.colour.ColourObj;
+import com.chromascape.utils.core.screen.topology.ChromaObj;
+import com.chromascape.utils.core.screen.topology.ColourContours;
 import com.chromascape.utils.core.screen.topology.TemplateMatching;
 import com.chromascape.utils.core.screen.window.ScreenManager;
-import com.chromascape.utils.domain.ocr.Ocr;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
+import java.util.List;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.bytedeco.opencv.opencv_core.Scalar;
 
 /**
  * Common inventory operations: checking, counting, finding, and clicking items by template.
@@ -145,18 +148,26 @@ public class Inventory {
     return PointSelector.getRandomPointInImage(templatePath, gameView, threshold);
   }
 
+  // "Click here to continue" blue: RGB(0, 0, 128) → HSV(120, 255, 128)
+  private static final ColourObj DIALOG_BLUE =
+      new ColourObj("dialogBlue", new Scalar(118, 200, 100, 0), new Scalar(122, 255, 255, 0));
+
   /**
-   * Checks if the inventory is full by reading the chatbox for "can't carry" or "full".
-   * Requires the chat tab to be visible and Idle Notifier plugin enabled.
+   * Checks if a dialog is present in the chatbox (blue "Click here to continue" pixels).
+   * Detects inventory-full notifications, level-up dialogs, and other game dialogs.
    *
    * @param base the active script instance
-   * @param chatColour the colour to OCR against (typically black for standard chat text)
-   * @return true if chat indicates inventory is full
+   * @return true if a dialog is present in the chat zone
    */
-  public static boolean isFullByChat(BaseScript base, ColourObj chatColour) {
+  public static boolean isFullByChat(BaseScript base) {
     Rectangle chat = base.controller().zones().getChatTabs().get("Chat");
     if (chat == null) return false;
-    String text = Ocr.extractText(chat, "Plain 12", chatColour, true).toLowerCase();
-    return text.contains("can't carry") || text.contains("full");
+    BufferedImage chatImg = ScreenManager.captureZone(chat);
+    List<ChromaObj> blueObjs = ColourContours.getChromaObjsInColour(chatImg, DIALOG_BLUE);
+    boolean detected = !blueObjs.isEmpty();
+    for (ChromaObj obj : blueObjs) {
+      obj.release();
+    }
+    return detected;
   }
 }

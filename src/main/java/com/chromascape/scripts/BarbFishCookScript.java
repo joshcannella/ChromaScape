@@ -65,8 +65,6 @@ public class BarbFishCookScript extends BaseScript {
       new ColourObj("red", new Scalar(0, 254, 254, 0), new Scalar(1, 255, 255, 0));
   private static final ColourObj BANK_COLOUR =
       new ColourObj("green", new Scalar(60, 254, 254, 0), new Scalar(61, 255, 255, 0));
-  private static final ColourObj CHAT_BLACK =
-      new ColourObj("black", new Scalar(0, 0, 0, 0), new Scalar(0, 0, 0, 0));
 
   // === Tiles ===
   private static final Point FISHING_TILE = new Point(3104, 3424);
@@ -154,7 +152,7 @@ public class BarbFishCookScript extends BaseScript {
       waitMillis(HumanBehavior.adjustDelay(300, 500));
     }
 
-    if (Inventory.isFullByChat(this, CHAT_BLACK)) {
+    if (Inventory.isFullByChat(this)) {
       logger.info("Inventory full. State: FISHING → COOK_TROUT");
       state = State.COOK_TROUT;
       stuckCounter = 0;

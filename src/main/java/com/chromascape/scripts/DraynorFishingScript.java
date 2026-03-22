@@ -146,7 +146,7 @@ public class DraynorFishingScript extends BaseScript {
       waitMillis(HumanBehavior.adjustDelay(300, 500));
     }
 
-    if (Inventory.isFullByChat(this, CHAT_BLACK)
+    if (Inventory.isFullByChat(this)
         || Inventory.isFull(this, KNOWN_ITEMS, THRESHOLD)) {
       State next = BANKING_ENABLED ? State.WALK_TO_BANK : State.DROP;
       logger.info("Inventory full. State: FISHING → {}", next);
