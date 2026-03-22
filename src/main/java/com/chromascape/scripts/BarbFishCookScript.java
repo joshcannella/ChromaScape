@@ -222,7 +222,13 @@ public class BarbFishCookScript extends BaseScript {
       stuckCounter = 0;
       return;
     }
-    Walk.to(this, BANK_TILE, "bank");
+    LevelUpDismisser.dismissIfPresent(this);
+    if (!Walk.to(this, BANK_TILE, "bank")) { stuckCounter++; return; }
+    // Keep walking until bank is visible or stuck
+    for (int i = 0; i < 3 && !ColourClick.isVisible(this, BANK_COLOUR); i++) {
+      checkInterrupted();
+      Walk.to(this, BANK_TILE, "bank");
+    }
     if (ColourClick.isVisible(this, BANK_COLOUR)) {
       logger.info("State: WALK_TO_BANK → BANKING");
       state = State.BANKING;
@@ -281,9 +287,12 @@ public class BarbFishCookScript extends BaseScript {
   }
 
   private void walkToFish() {
-    if (!Walk.to(this, FISHING_TILE, "fishing spot")) {
-      stuckCounter++;
-      return;
+    LevelUpDismisser.dismissIfPresent(this);
+    if (!Walk.to(this, FISHING_TILE, "fishing spot")) { stuckCounter++; return; }
+    // Keep walking until spot is visible or stuck
+    for (int i = 0; i < 3 && !ColourClick.isVisible(this, SPOT_COLOUR); i++) {
+      checkInterrupted();
+      Walk.to(this, FISHING_TILE, "fishing spot");
     }
     logger.info("State: WALK_TO_FISH → FISHING");
     state = State.FISHING;
