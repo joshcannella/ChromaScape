@@ -148,14 +148,13 @@ public class BarbFishCookScript extends BaseScript {
     }
 
     waitMillis(HumanBehavior.adjustDelay(300, 500));
-    if (LevelUpDismisser.dismissIfPresent(this)) {
-      waitMillis(HumanBehavior.adjustDelay(300, 500));
-    }
-
     if (Inventory.isFullByChat(this)) {
       logger.info("Inventory full. State: FISHING → COOK_TROUT");
+      KeyPress.space(this);
       state = State.COOK_TROUT;
       stuckCounter = 0;
+    } else if (LevelUpDismisser.dismissIfPresent(this)) {
+      waitMillis(HumanBehavior.adjustDelay(300, 500));
     }
   }
 
