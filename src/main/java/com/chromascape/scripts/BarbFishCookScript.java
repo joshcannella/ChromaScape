@@ -120,8 +120,10 @@ public class BarbFishCookScript extends BaseScript {
   }
 
   private void fish() {
-    // Check full inventory on entry — template-only, no chat OCR (stale "full" text causes false positives)
-    if (Inventory.isFull(this, KNOWN_ITEMS, THRESHOLD)) {
+    // Check full inventory on entry — require at least 1 fish to avoid false positive on empty inv
+    boolean hasFish = Inventory.hasItem(this, RAW_TROUT, THRESHOLD)
+        || Inventory.hasItem(this, RAW_SALMON, THRESHOLD);
+    if (hasFish && Inventory.isFull(this, KNOWN_ITEMS, THRESHOLD)) {
       logger.info("Inventory full. State: FISHING → COOK_TROUT");
       state = State.COOK_TROUT;
       stuckCounter = 0;
@@ -162,7 +164,8 @@ public class BarbFishCookScript extends BaseScript {
     }
 
     if (Inventory.isFullByChat(this, CHAT_BLACK)
-        || Inventory.isFull(this, KNOWN_ITEMS, THRESHOLD)) {
+        || (Inventory.hasItem(this, RAW_TROUT, THRESHOLD)
+            && Inventory.isFull(this, KNOWN_ITEMS, THRESHOLD))) {
       logger.info("Inventory full. State: FISHING → COOK_TROUT");
       state = State.COOK_TROUT;
       stuckCounter = 0;
