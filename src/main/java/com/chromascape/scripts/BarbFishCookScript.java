@@ -173,11 +173,13 @@ public class BarbFishCookScript extends BaseScript {
       if (!ColourClick.isVisible(this, FIRE_COLOUR)) { stuckCounter++; return; }
     }
 
-    // Cook each raw fish type
-    for (String rawTemplate : new String[]{RAW_TROUT, RAW_SALMON}) {
-      if (!Inventory.hasItem(this, rawTemplate, THRESHOLD)) continue;
+    // Cook all raw fish — repeat until no raw fish remain
+    for (int round = 0; round < 2; round++) {
+      String rawTemplate = Inventory.hasItem(this, RAW_TROUT, THRESHOLD) ? RAW_TROUT
+          : Inventory.hasItem(this, RAW_SALMON, THRESHOLD) ? RAW_SALMON : null;
+      if (rawTemplate == null) break;
 
-      if (!Inventory.clickItem(this, rawTemplate, THRESHOLD, "medium")) continue;
+      if (!Inventory.clickItem(this, rawTemplate, THRESHOLD, "medium")) { stuckCounter++; return; }
       waitMillis(HumanBehavior.adjustDelay(250, 400));
 
       Point fire = ColourClick.getClickPoint(this, FIRE_COLOUR);
@@ -190,13 +192,11 @@ public class BarbFishCookScript extends BaseScript {
       controller().mouse().leftClick();
 
       // Spam space until cooking starts
-      int rawBefore = Inventory.countItem(this, rawTemplate, THRESHOLD);
       Instant cookDeadline = Instant.now().plus(Duration.ofSeconds(8));
       while (Instant.now().isBefore(cookDeadline)) {
         checkInterrupted();
         KeyPress.space(this);
         waitMillis(HumanBehavior.adjustDelay(600, 900));
-        if (Inventory.countItem(this, rawTemplate, THRESHOLD) < rawBefore) break;
       }
 
       // Wait for cooking to finish, dismissing level-up dialogs mid-cook
