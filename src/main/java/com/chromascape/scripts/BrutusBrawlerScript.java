@@ -39,6 +39,7 @@ import org.bytedeco.opencv.opencv_core.Scalar;
  * Camera zoom locked. Idle Notifier enabled. XP bar permanent.
  * <p><b>Image Templates:</b> Trout.png, Raw_t-bone_steak.png
  */
+@ScriptVersion(major = 0, minor = 1)
 public class BrutusBrawlerScript extends BaseScript {
 
   private static final Logger logger = LogManager.getLogger(BrutusBrawlerScript.class);

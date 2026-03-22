@@ -1,5 +1,6 @@
 package com.chromascape.web.instance;
 
+import com.chromascape.scripts.ScriptVersion;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -47,7 +48,7 @@ public class SendScripts {
     }
   }
 
-  /** Combines the script's semantic VERSION field with the git short hash. */
+  /** Combines the script's @ScriptVersion annotation with the git short hash. */
   private static String buildVersion(String fileName) {
     String hash = gitHash(SCRIPTS_DIR.resolve(fileName));
     String semver = readSemver(fileName);
@@ -57,12 +58,14 @@ public class SendScripts {
     return hash.isEmpty() ? semver : semver + "." + hash;
   }
 
-  /** Reads the public static VERSION field (major.minor) from the script class. */
+  /** Reads @ScriptVersion(major, minor) from the script class. */
   private static String readSemver(String fileName) {
     String className =
         "com.chromascape.scripts." + fileName.replace(".java", "").replace("/", ".");
     try {
-      return (String) Class.forName(className).getField("VERSION").get(null);
+      Class<?> clazz = Class.forName(className);
+      ScriptVersion sv = clazz.getAnnotation(ScriptVersion.class);
+      return sv != null ? sv.major() + "." + sv.minor() : "";
     } catch (Exception e) {
       return "";
     }

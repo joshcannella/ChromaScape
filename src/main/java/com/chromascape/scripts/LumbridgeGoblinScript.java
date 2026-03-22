@@ -28,6 +28,7 @@ import org.bytedeco.opencv.opencv_core.Scalar;
  * (combat idle detection). Ground Items — highlight loot in purple (optional).
  * <p><b>Image Templates:</b> Trout.png (or whichever food you bring)
  */
+@ScriptVersion(major = 0, minor = 1)
 public class LumbridgeGoblinScript extends BaseScript {
 
   private static final Logger logger = LogManager.getLogger(LumbridgeGoblinScript.class);

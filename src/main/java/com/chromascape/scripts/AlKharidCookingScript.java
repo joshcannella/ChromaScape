@@ -27,6 +27,7 @@ import org.bytedeco.opencv.opencv_core.Scalar;
  * <p><b>RuneLite Setup:</b> Object Markers — range highlighted red, bank booth highlighted cyan.
  * <p><b>Start:</b> Near Al Kharid bank or range with raw shrimp in bank.
  */
+@ScriptVersion(major = 0, minor = 1)
 public class AlKharidCookingScript extends BaseScript {
 
   private static final Logger logger = LogManager.getLogger(AlKharidCookingScript.class);

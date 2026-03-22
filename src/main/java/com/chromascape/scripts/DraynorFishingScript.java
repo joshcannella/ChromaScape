@@ -35,6 +35,7 @@ import org.bytedeco.opencv.opencv_core.Scalar;
  *
  * <p><b>Starting Position:</b> Near Draynor Village fishing spot on the south shore.
  */
+@ScriptVersion(major = 0, minor = 1)
 public class DraynorFishingScript extends BaseScript {
 
   private static final Logger logger = LogManager.getLogger(DraynorFishingScript.class);

@@ -35,6 +35,7 @@ import org.bytedeco.opencv.opencv_core.Scalar;
  *   <li>ChromaScape RuneLite Profile: activated</li>
  * </ul>
  */
+@ScriptVersion(major = 0, minor = 1)
 public class ChickenKillerScript extends BaseScript {
 
   private static final Logger logger = LogManager.getLogger(ChickenKillerScript.class);

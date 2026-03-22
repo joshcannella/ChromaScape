@@ -39,6 +39,7 @@ import org.apache.logging.log4j.Logger;
  * <a href="https://oldschool.runescape.wiki/w/Al_Kharid_mine">Al Kharid mine</a> — (3298, 3293),
  * <a href="https://oldschool.runescape.wiki/w/Al_Kharid_bank">Al Kharid bank</a> — (3269, 3167).
  */
+@ScriptVersion(major = 0, minor = 1)
 public class AlKharidIronMiningScript extends BaseScript {
 
     private static final Logger logger = LogManager.getLogger(AlKharidIronMiningScript.class);

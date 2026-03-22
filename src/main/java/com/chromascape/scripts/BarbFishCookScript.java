@@ -35,10 +35,10 @@ import org.bytedeco.opencv.opencv_core.Scalar;
  *   <li>Shift-click drop — enabled</li>
  * </ul>
  */
+@ScriptVersion(major = 0, minor = 1)
 public class BarbFishCookScript extends BaseScript {
 
   private static final Logger logger = LogManager.getLogger(BarbFishCookScript.class);
-  public static final String VERSION = "0.1";
 
   private enum State {
     FISHING, COOK_TROUT, COOK_SALMON, DROP_BURNT, WALK_TO_BANK, BANKING, WALK_TO_FISH
