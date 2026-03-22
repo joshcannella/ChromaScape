@@ -45,8 +45,9 @@ public class LevelUpDismisser {
 
     BufferedImage chatImg = ScreenManager.captureZone(chatZone);
     List<ChromaObj> blueObjs = ColourContours.getChromaObjsInColour(chatImg, DIALOG_BLUE);
-    boolean detected = !blueObjs.isEmpty();
+    boolean detected = false;
     for (ChromaObj obj : blueObjs) {
+      if (obj.boundingBox().width > 50) detected = true;
       obj.release();
     }
 

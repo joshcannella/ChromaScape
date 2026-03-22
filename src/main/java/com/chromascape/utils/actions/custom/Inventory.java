@@ -164,8 +164,9 @@ public class Inventory {
     if (chat == null) return false;
     BufferedImage chatImg = ScreenManager.captureZone(chat);
     List<ChromaObj> blueObjs = ColourContours.getChromaObjsInColour(chatImg, DIALOG_BLUE);
-    boolean detected = !blueObjs.isEmpty();
+    boolean detected = false;
     for (ChromaObj obj : blueObjs) {
+      if (obj.boundingBox().width > 50) detected = true;
       obj.release();
     }
     return detected;
