@@ -114,7 +114,6 @@ public class BarbFishCookScript extends BaseScript {
       case FISHING -> fish();
       case COOKING -> cook();
       case WALK_TO_BANK -> walkToBank();
-      case WALK_TO_BANK -> walkToBank();
       case BANKING -> bank();
       case WALK_TO_FISH -> walkToFish();
     }
