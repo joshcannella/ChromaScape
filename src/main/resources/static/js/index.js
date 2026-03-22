@@ -42,6 +42,7 @@ document.addEventListener("DOMContentLoaded", () => {
 async function initializeUI() {
     connectLogWebSocket();
     connectStateWebSocket();
+    fetchVersion();
 
     try {
         await fetchAndRenderScripts();
@@ -398,3 +399,18 @@ function connectStateWebSocket() {
     initialize();
 }
 
+
+// ----------------- VERSION -----------------
+
+/**
+ * Fetches the build version from the backend and displays it in the navbar.
+ */
+function fetchVersion() {
+    fetch("/api/version")
+        .then(res => res.json())
+        .then(data => {
+            const pill = document.getElementById("version-pill");
+            if (pill) pill.textContent = "v" + data.version;
+        })
+        .catch(err => console.warn("Could not fetch version:", err));
+}

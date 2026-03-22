@@ -20,6 +20,7 @@ java {
 
 springBoot {
 	mainClass.set("com.chromascape.web.ChromaScapeApplication")
+	buildInfo()
 }
 
 repositories {
