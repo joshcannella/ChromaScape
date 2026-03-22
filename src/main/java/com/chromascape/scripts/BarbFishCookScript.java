@@ -125,7 +125,7 @@ public class BarbFishCookScript extends BaseScript {
       return;
     }
 
-    Point spot = ColourClick.getClickPoint(this, SPOT_COLOUR, 10.0);
+    Point spot = ColourClick.getClickPoint(this, SPOT_COLOUR, 15.0);
     if (spot == null) { stuckCounter++; return; }
 
     String speed = HumanBehavior.shouldSlowApproach() ? "slow" : "medium";
