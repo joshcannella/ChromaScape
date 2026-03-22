@@ -53,7 +53,8 @@ public class BarbFishCookScript extends BaseScript {
   private static final String FEATHER = "/images/user/Feather.png";
   private static final String FEATHER_STACK = "/images/user/Feather_stack.png";
   private static final String[] KNOWN_ITEMS =
-      {ROD, FEATHER_STACK, RAW_TROUT, RAW_SALMON, COOKED_TROUT, COOKED_SALMON, BURNT_FISH};
+      {ROD, FEATHER, FEATHER_STACK, RAW_TROUT, RAW_SALMON, COOKED_TROUT, COOKED_SALMON,
+          BURNT_FISH};
 
   // === Colours ===
   private static final ColourObj SPOT_COLOUR =
@@ -119,7 +120,8 @@ public class BarbFishCookScript extends BaseScript {
 
   private void fish() {
     // Check full inventory on entry (handles starting with full inv)
-    if (Inventory.isFull(this, KNOWN_ITEMS, THRESHOLD)) {
+    if (Inventory.isFullByChat(this, CHAT_BLACK)
+        || Inventory.isFull(this, KNOWN_ITEMS, THRESHOLD)) {
       logger.info("Inventory full. State: FISHING → COOK_TROUT");
       state = State.COOK_TROUT;
       stuckCounter = 0;
