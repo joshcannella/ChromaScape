@@ -50,6 +50,7 @@ public class BarbFishCookScript extends BaseScript {
   private static final String COOKED_TROUT = "/images/user/Trout.png";
   private static final String COOKED_SALMON = "/images/user/Salmon.png";
   private static final String BURNT_FISH = "/images/user/Burnt_fish.png";
+  private static final double BURNT_THRESHOLD = 0.04;
   private static final String ROD = "/images/user/Fly_fishing_rod.png";
   private static final String FEATHER = "/images/user/Feather.png";
   private static final String FEATHER_STACK = "/images/user/Feather_stack.png";
@@ -222,7 +223,7 @@ public class BarbFishCookScript extends BaseScript {
   }
 
   private void dropBurnt() {
-    if (!Inventory.hasItem(this, BURNT_FISH, THRESHOLD)) {
+    if (!Inventory.hasItem(this, BURNT_FISH, BURNT_THRESHOLD)) {
       logger.info("No burnt fish. State: DROP_BURNT → WALK_TO_BANK");
       state = State.WALK_TO_BANK;
       return;
@@ -233,7 +234,7 @@ public class BarbFishCookScript extends BaseScript {
     Instant deadline = Instant.now().plus(Duration.ofSeconds(30));
     try {
       int slot;
-      while ((slot = Inventory.findItemSlot(this, BURNT_FISH, THRESHOLD)) >= 0) {
+      while ((slot = Inventory.findItemSlot(this, BURNT_FISH, BURNT_THRESHOLD)) >= 0) {
         checkInterrupted();
         if (Instant.now().isAfter(deadline)) {
           logger.warn("Drop loop timed out.");
