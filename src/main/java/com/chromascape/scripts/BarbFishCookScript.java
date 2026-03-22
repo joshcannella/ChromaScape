@@ -59,7 +59,7 @@ public class BarbFishCookScript extends BaseScript {
 
   // === Colours ===
   private static final ColourObj SPOT_COLOUR =
-      new ColourObj("cyan", new Scalar(90, 254, 254, 0), new Scalar(91, 255, 255, 0));
+      new ColourObj("cyan", new Scalar(90, 236, 241, 0), new Scalar(91, 241, 242, 0));
   private static final ColourObj FIRE_COLOUR =
       new ColourObj("red", new Scalar(0, 254, 254, 0), new Scalar(1, 255, 255, 0));
   private static final ColourObj BANK_COLOUR =
