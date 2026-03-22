@@ -154,9 +154,7 @@ public class BarbFishCookScript extends BaseScript {
       waitMillis(HumanBehavior.adjustDelay(300, 500));
     }
 
-    if (Inventory.isFullByChat(this, CHAT_BLACK)
-        || (Inventory.hasItem(this, RAW_TROUT, THRESHOLD)
-            && Inventory.isFull(this, KNOWN_ITEMS, THRESHOLD))) {
+    if (Inventory.isFullByChat(this, CHAT_BLACK)) {
       logger.info("Inventory full. State: FISHING → COOK_TROUT");
       state = State.COOK_TROUT;
       stuckCounter = 0;
