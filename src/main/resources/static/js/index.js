@@ -316,6 +316,10 @@ async function startScript(config) {
         body: JSON.stringify(config)
     });
     if (!res.ok) throw new Error("Failed to start script");
+    const data = await res.json();
+    if (data.scriptVersion) {
+        sessionStorage.setItem("scriptVersion", data.scriptVersion);
+    }
     // Trigger a full page reload to ensure fresh state (clear logs, reset UI)
     window.location.reload();
 }
@@ -332,6 +336,9 @@ async function stopScript() {
     });
     if (!res.ok) throw new Error("Failed to stop script");
     isStarted = false;
+    sessionStorage.removeItem("scriptVersion");
+    const svPill = document.getElementById("script-version-pill");
+    if (svPill) svPill.textContent = "";
 }
 
 /**
@@ -404,6 +411,7 @@ function connectStateWebSocket() {
 
 /**
  * Fetches the build version from the backend and displays it in the navbar.
+ * Also restores the running script version from sessionStorage if present.
  */
 function fetchVersion() {
     fetch("/api/version")
@@ -413,4 +421,10 @@ function fetchVersion() {
             if (pill) pill.textContent = "v" + data.version;
         })
         .catch(err => console.warn("Could not fetch version:", err));
+
+    const sv = sessionStorage.getItem("scriptVersion");
+    if (sv) {
+        const pill = document.getElementById("script-version-pill");
+        if (pill) pill.textContent = "script v" + sv;
+    }
 }

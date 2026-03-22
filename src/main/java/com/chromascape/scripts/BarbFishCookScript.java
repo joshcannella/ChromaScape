@@ -38,6 +38,7 @@ import org.bytedeco.opencv.opencv_core.Scalar;
 public class BarbFishCookScript extends BaseScript {
 
   private static final Logger logger = LogManager.getLogger(BarbFishCookScript.class);
+  public static final String VERSION = "0.1.3";
 
   private enum State {
     FISHING, COOK_TROUT, COOK_SALMON, DROP_BURNT, WALK_TO_BANK, BANKING, WALK_TO_FISH
