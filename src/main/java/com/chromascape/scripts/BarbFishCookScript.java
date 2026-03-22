@@ -198,9 +198,15 @@ public class BarbFishCookScript extends BaseScript {
     controller().mouse().microJitter();
     controller().mouse().leftClick();
 
-    // Poll for cooking interface to open (wait for "Cook" text or just a longer adaptive wait)
-    waitMillis(HumanBehavior.adjustDelay(1400, 1800));
-    KeyPress.space(this);
+    // Spam space until cook dialog is accepted (raw fish count drops = cooking started)
+    int rawBefore = Inventory.countItem(this, rawTemplate, THRESHOLD);
+    Instant cookDeadline = Instant.now().plus(Duration.ofSeconds(8));
+    while (Instant.now().isBefore(cookDeadline)) {
+      checkInterrupted();
+      KeyPress.space(this);
+      waitMillis(HumanBehavior.adjustDelay(600, 900));
+      if (Inventory.countItem(this, rawTemplate, THRESHOLD) < rawBefore) break;
+    }
     Idler.waitUntilIdle(this, 120);
 
     waitMillis(HumanBehavior.adjustDelay(300, 500));
