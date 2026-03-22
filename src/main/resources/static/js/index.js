@@ -149,6 +149,11 @@ function renderScriptList(scripts) {
 
             selectedScriptName = script;
             previouslySelectedElement = listItem;
+
+            const statScript = document.getElementById("stat-script");
+            if (statScript) {
+                statScript.textContent = script.replace("Script.java", "") + (version ? "  v" + version : "");
+            }
         });
     });
 }
