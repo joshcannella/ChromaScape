@@ -49,6 +49,8 @@ public class BarbFishCookScript extends BaseScript {
   // === Templates ===
   private static final String RAW_TROUT = "/images/user/Raw_trout.png";
   private static final String RAW_SALMON = "/images/user/Raw_salmon.png";
+  private static final String COOKED_TROUT = "/images/user/Trout.png";
+  private static final String COOKED_SALMON = "/images/user/Salmon.png";
   private static final String ROD = "/images/user/Fly_fishing_rod.png";
   private static final String FEATHER = "/images/user/Feather.png";
   private static final String FEATHER_STACK = "/images/user/Feather_stack.png";
@@ -217,7 +219,17 @@ public class BarbFishCookScript extends BaseScript {
   }
 
   private void dropFish() {
-    ItemDropper.dropAll(this, ItemDropper.DropPattern.ZIGZAG, new int[]{0, 1});
+    for (int attempt = 0; attempt < 3; attempt++) {
+      ItemDropper.dropAll(this, ItemDropper.DropPattern.ZIGZAG, new int[]{0, 1});
+      waitMillis(HumanBehavior.adjustDelay(300, 500));
+      if (!Inventory.hasItem(this, RAW_TROUT, THRESHOLD)
+          && !Inventory.hasItem(this, RAW_SALMON, THRESHOLD)
+          && !Inventory.hasItem(this, COOKED_TROUT, THRESHOLD)
+          && !Inventory.hasItem(this, COOKED_SALMON, THRESHOLD)) {
+        break;
+      }
+      logger.warn("Fish still in inventory after drop, retrying...");
+    }
     logger.info("State: DROPPING → WALK_TO_FISH");
     state = State.WALK_TO_FISH;
     stuckCounter = 0;
