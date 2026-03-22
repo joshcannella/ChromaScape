@@ -178,38 +178,36 @@ public class BarbFishCookScript extends BaseScript {
       if (!ColourClick.isVisible(this, FIRE_COLOUR)) { stuckCounter++; return; }
     }
 
-    // Use first raw fish on fire — Cook All handles the entire inventory
-    String rawTemplate = Inventory.hasItem(this, RAW_TROUT, THRESHOLD) ? RAW_TROUT
-        : Inventory.hasItem(this, RAW_SALMON, THRESHOLD) ? RAW_SALMON : null;
-    if (rawTemplate == null) { state = DROP_AFTER_COOK ? State.DROPPING : State.WALK_TO_BANK; return; }
+    // Cook salmon first (avoids cooked-trout matching as raw-salmon), then trout
+    for (String rawTemplate : new String[]{RAW_SALMON, RAW_TROUT}) {
+      if (!Inventory.hasItem(this, rawTemplate, THRESHOLD)) continue;
 
-    if (!Inventory.clickItem(this, rawTemplate, THRESHOLD, "medium")) { stuckCounter++; return; }
-    waitMillis(HumanBehavior.adjustDelay(250, 400));
+      if (!Inventory.clickItem(this, rawTemplate, THRESHOLD, "medium")) { stuckCounter++; return; }
+      waitMillis(HumanBehavior.adjustDelay(250, 400));
 
-    Point fire = ColourClick.getClickPoint(this, FIRE_COLOUR);
-    if (fire == null) { stuckCounter++; return; }
+      Point fire = ColourClick.getClickPoint(this, FIRE_COLOUR);
+      if (fire == null) { stuckCounter++; return; }
 
-    String speed = HumanBehavior.shouldSlowApproach() ? "slow" : "medium";
-    controller().mouse().moveTo(fire, speed);
-    if (HumanBehavior.shouldHesitate()) HumanBehavior.performHesitation();
-    controller().mouse().microJitter();
-    controller().mouse().leftClick();
+      String speed = HumanBehavior.shouldSlowApproach() ? "slow" : "medium";
+      controller().mouse().moveTo(fire, speed);
+      if (HumanBehavior.shouldHesitate()) HumanBehavior.performHesitation();
+      controller().mouse().microJitter();
+      controller().mouse().leftClick();
 
-    // Spam space until cooking starts
-    Instant cookDeadline = Instant.now().plus(Duration.ofSeconds(8));
-    while (Instant.now().isBefore(cookDeadline)) {
-      checkInterrupted();
-      KeyPress.space(this);
-      waitMillis(HumanBehavior.adjustDelay(600, 900));
-    }
+      Instant cookDeadline = Instant.now().plus(Duration.ofSeconds(8));
+      while (Instant.now().isBefore(cookDeadline)) {
+        checkInterrupted();
+        KeyPress.space(this);
+        waitMillis(HumanBehavior.adjustDelay(600, 900));
+      }
 
-    // Wait for cooking to finish, dismissing level-up dialogs mid-cook
-    Instant idleDeadline = Instant.now().plus(Duration.ofSeconds(120));
-    while (Instant.now().isBefore(idleDeadline)) {
-      checkInterrupted();
-      if (Idler.waitUntilIdle(this, 5)) break;
-      if (LevelUpDismisser.dismissIfPresent(this)) {
-        waitMillis(HumanBehavior.adjustDelay(300, 500));
+      Instant idleDeadline = Instant.now().plus(Duration.ofSeconds(120));
+      while (Instant.now().isBefore(idleDeadline)) {
+        checkInterrupted();
+        if (Idler.waitUntilIdle(this, 5)) break;
+        if (LevelUpDismisser.dismissIfPresent(this)) {
+          waitMillis(HumanBehavior.adjustDelay(300, 500));
+        }
       }
     }
 
