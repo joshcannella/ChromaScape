@@ -27,7 +27,7 @@ import org.bytedeco.opencv.opencv_core.Scalar;
 /**
  * Fly fishes trout/salmon at Barbarian Village, cooks on the permanent fire, banks at Edgeville.
  *
- * <p><b>Flow:</b> FISH → COOK_TROUT → COOK_SALMON → DROP_BURNT → WALK_TO_BANK → BANKING →
+ * <p><b>Flow:</b> FISH → COOKING → DROP_BURNT → WALK_TO_BANK → BANKING →
  * WALK_TO_FISH → repeat
  *
  * <p><b>RuneLite Setup:</b>
@@ -44,7 +44,7 @@ public class BarbFishCookScript extends BaseScript {
   private static final Logger logger = LogManager.getLogger(BarbFishCookScript.class);
 
   private enum State {
-    FISHING, COOK_TROUT, COOK_SALMON, DROP_BURNT, WALK_TO_BANK, BANKING, WALK_TO_FISH
+    FISHING, COOKING, DROP_BURNT, WALK_TO_BANK, BANKING, WALK_TO_FISH
   }
 
   // === Templates ===
@@ -112,8 +112,7 @@ public class BarbFishCookScript extends BaseScript {
 
     switch (state) {
       case FISHING -> fish();
-      case COOK_TROUT -> cookFish(RAW_TROUT, State.COOK_SALMON);
-      case COOK_SALMON -> cookFish(RAW_SALMON, State.DROP_BURNT);
+      case COOKING -> cook();
       case DROP_BURNT -> dropBurnt();
       case WALK_TO_BANK -> walkToBank();
       case BANKING -> bank();
@@ -162,16 +161,19 @@ public class BarbFishCookScript extends BaseScript {
     BufferedImage slotImg = ScreenManager.captureZone(lastSlot);
     if (TemplateMatching.match(RAW_TROUT, slotImg, THRESHOLD).success()
         || TemplateMatching.match(RAW_SALMON, slotImg, THRESHOLD).success()) {
-      logger.info("Inventory full (fish in last slot). State: FISHING → COOK_TROUT");
-      state = State.COOK_TROUT;
+      logger.info("Inventory full (fish in last slot). State: FISHING → COOKING");
+      state = State.COOKING;
       stuckCounter = 0;
     }
   }
 
-  private void cookFish(String rawTemplate, State nextState) {
-    if (!Inventory.hasItem(this, rawTemplate, THRESHOLD)) {
-      logger.info("No {} left. State: → {}", rawTemplate, nextState);
-      state = nextState;
+  private void cook() {
+    boolean hasRaw = Inventory.hasItem(this, RAW_TROUT, THRESHOLD)
+        || Inventory.hasItem(this, RAW_SALMON, THRESHOLD);
+    if (!hasRaw) {
+      logger.info("No raw fish. State: COOKING → DROP_BURNT");
+      state = State.DROP_BURNT;
+      stuckCounter = 0;
       return;
     }
 
@@ -181,43 +183,46 @@ public class BarbFishCookScript extends BaseScript {
       if (!ColourClick.isVisible(this, FIRE_COLOUR)) { stuckCounter++; return; }
     }
 
-    // Use raw fish on fire
-    if (!Inventory.clickItem(this, rawTemplate, THRESHOLD, "medium")) { stuckCounter++; return; }
-    waitMillis(HumanBehavior.adjustDelay(250, 400));
+    // Cook each raw fish type
+    for (String rawTemplate : new String[]{RAW_TROUT, RAW_SALMON}) {
+      if (!Inventory.hasItem(this, rawTemplate, THRESHOLD)) continue;
 
-    Point fire = ColourClick.getClickPoint(this, FIRE_COLOUR);
-    if (fire == null) { stuckCounter++; return; }
+      if (!Inventory.clickItem(this, rawTemplate, THRESHOLD, "medium")) continue;
+      waitMillis(HumanBehavior.adjustDelay(250, 400));
 
-    String speed = HumanBehavior.shouldSlowApproach() ? "slow" : "medium";
-    controller().mouse().moveTo(fire, speed);
-    if (HumanBehavior.shouldHesitate()) HumanBehavior.performHesitation();
-    controller().mouse().microJitter();
-    controller().mouse().leftClick();
+      Point fire = ColourClick.getClickPoint(this, FIRE_COLOUR);
+      if (fire == null) { stuckCounter++; return; }
 
-    // Spam space until cook dialog is accepted (raw fish count drops = cooking started)
-    int rawBefore = Inventory.countItem(this, rawTemplate, THRESHOLD);
-    Instant cookDeadline = Instant.now().plus(Duration.ofSeconds(8));
-    while (Instant.now().isBefore(cookDeadline)) {
-      checkInterrupted();
-      KeyPress.space(this);
-      waitMillis(HumanBehavior.adjustDelay(600, 900));
-      if (Inventory.countItem(this, rawTemplate, THRESHOLD) < rawBefore) break;
-    }
-    // Wait for cooking to finish, dismissing level-up dialogs mid-cook
-    Instant idleDeadline = Instant.now().plus(Duration.ofSeconds(120));
-    while (Instant.now().isBefore(idleDeadline)) {
-      checkInterrupted();
-      if (Idler.waitUntilIdle(this, 5)) break;
-      if (LevelUpDismisser.dismissIfPresent(this)) {
-        waitMillis(HumanBehavior.adjustDelay(300, 500));
+      String speed = HumanBehavior.shouldSlowApproach() ? "slow" : "medium";
+      controller().mouse().moveTo(fire, speed);
+      if (HumanBehavior.shouldHesitate()) HumanBehavior.performHesitation();
+      controller().mouse().microJitter();
+      controller().mouse().leftClick();
+
+      // Spam space until cooking starts
+      int rawBefore = Inventory.countItem(this, rawTemplate, THRESHOLD);
+      Instant cookDeadline = Instant.now().plus(Duration.ofSeconds(8));
+      while (Instant.now().isBefore(cookDeadline)) {
+        checkInterrupted();
+        KeyPress.space(this);
+        waitMillis(HumanBehavior.adjustDelay(600, 900));
+        if (Inventory.countItem(this, rawTemplate, THRESHOLD) < rawBefore) break;
+      }
+
+      // Wait for cooking to finish, dismissing level-up dialogs mid-cook
+      Instant idleDeadline = Instant.now().plus(Duration.ofSeconds(120));
+      while (Instant.now().isBefore(idleDeadline)) {
+        checkInterrupted();
+        if (Idler.waitUntilIdle(this, 5)) break;
+        if (LevelUpDismisser.dismissIfPresent(this)) {
+          waitMillis(HumanBehavior.adjustDelay(300, 500));
+        }
       }
     }
 
-    if (!Inventory.hasItem(this, rawTemplate, THRESHOLD)) {
-      logger.info("All {} cooked. State: → {}", rawTemplate, nextState);
-      state = nextState;
-      stuckCounter = 0;
-    }
+    logger.info("State: COOKING → DROP_BURNT");
+    state = State.DROP_BURNT;
+    stuckCounter = 0;
   }
 
   private void dropBurnt() {
