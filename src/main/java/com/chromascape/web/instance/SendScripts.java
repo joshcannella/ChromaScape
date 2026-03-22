@@ -42,13 +42,34 @@ public class SendScripts {
           .map(SCRIPTS_DIR::relativize)
           .map(path -> path.toString().replace("\\", "/"))
           .sorted()
-          .map(name -> Map.of("name", name, "version", gitVersion(SCRIPTS_DIR.resolve(name))))
+          .map(name -> Map.of("name", name, "version", buildVersion(name)))
           .collect(Collectors.toList());
     }
   }
 
+  /** Combines the script's semantic VERSION field with the git short hash. */
+  private static String buildVersion(String fileName) {
+    String hash = gitHash(SCRIPTS_DIR.resolve(fileName));
+    String semver = readSemver(fileName);
+    if (semver.isEmpty()) {
+      return hash;
+    }
+    return hash.isEmpty() ? semver : semver + "." + hash;
+  }
+
+  /** Reads the public static VERSION field (major.minor) from the script class. */
+  private static String readSemver(String fileName) {
+    String className =
+        "com.chromascape.scripts." + fileName.replace(".java", "").replace("/", ".");
+    try {
+      return (String) Class.forName(className).getField("VERSION").get(null);
+    } catch (Exception e) {
+      return "";
+    }
+  }
+
   /** Returns the short git commit hash of the last commit that touched the given file. */
-  private static String gitVersion(Path file) {
+  private static String gitHash(Path file) {
     try {
       Process p = new ProcessBuilder("git", "log", "-1", "--format=%h", file.toString())
           .redirectErrorStream(true)
