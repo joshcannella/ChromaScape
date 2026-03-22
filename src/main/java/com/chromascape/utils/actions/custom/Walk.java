@@ -1,6 +1,7 @@
 package com.chromascape.utils.actions.custom;
 
 import com.chromascape.base.BaseScript;
+import com.chromascape.utils.actions.Idler;
 import java.awt.Point;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -31,7 +32,7 @@ public final class Walk {
   public static boolean to(BaseScript base, Point tile, String label) {
     try {
       base.controller().walker().pathTo(tile, false);
-      base.waitRandomMillis(4000, 6000);
+      Idler.waitUntilIdle(base, 30);
       return true;
     } catch (InterruptedException e) {
       logger.error("Walker interrupted going to {}", label);
