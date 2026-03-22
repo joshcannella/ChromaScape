@@ -109,7 +109,10 @@ function renderScriptList(scripts) {
 
     listGroup.innerHTML = ""; // Clear existing list
 
-    scripts.forEach(script => {
+    scripts.forEach(entry => {
+        const script = typeof entry === "string" ? entry : entry.name;
+        const version = typeof entry === "string" ? "" : entry.version;
+
         if (script === "package-info.java") return;
         if (script === "Screenshotter.java") return; // Exclude Screenshotter
 
@@ -118,10 +121,19 @@ function renderScriptList(scripts) {
         listItem.style.cursor = "pointer";
 
         const title = document.createElement("div");
-        title.className = "fw-bold p-2"; // Removed text-white to allow CSS to control color
+        title.className = "fw-bold p-2";
         title.textContent = script;
 
         listItem.appendChild(title);
+
+        if (version) {
+            const badge = document.createElement("span");
+            badge.className = "badge rounded-pill bg-info align-self-center";
+            badge.style.fontSize = "0.65rem";
+            badge.textContent = "v" + version;
+            listItem.appendChild(badge);
+        }
+
         listGroup.appendChild(listItem);
 
         listItem.addEventListener("click", () => {
@@ -316,10 +328,6 @@ async function startScript(config) {
         body: JSON.stringify(config)
     });
     if (!res.ok) throw new Error("Failed to start script");
-    const data = await res.json();
-    if (data.scriptVersion) {
-        sessionStorage.setItem("scriptVersion", data.scriptVersion);
-    }
     // Trigger a full page reload to ensure fresh state (clear logs, reset UI)
     window.location.reload();
 }
@@ -336,9 +344,6 @@ async function stopScript() {
     });
     if (!res.ok) throw new Error("Failed to stop script");
     isStarted = false;
-    sessionStorage.removeItem("scriptVersion");
-    const svPill = document.getElementById("script-version-pill");
-    if (svPill) svPill.textContent = "";
 }
 
 /**
@@ -411,7 +416,6 @@ function connectStateWebSocket() {
 
 /**
  * Fetches the build version from the backend and displays it in the navbar.
- * Also restores the running script version from sessionStorage if present.
  */
 function fetchVersion() {
     fetch("/api/version")
@@ -421,10 +425,4 @@ function fetchVersion() {
             if (pill) pill.textContent = "v" + data.version;
         })
         .catch(err => console.warn("Could not fetch version:", err));
-
-    const sv = sessionStorage.getItem("scriptVersion");
-    if (sv) {
-        const pill = document.getElementById("script-version-pill");
-        if (pill) pill.textContent = "script v" + sv;
-    }
 }

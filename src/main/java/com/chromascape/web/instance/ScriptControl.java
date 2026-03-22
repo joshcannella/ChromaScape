@@ -60,9 +60,7 @@ public class ScriptControl {
       ScriptInstanceManager.getInstance().setInstance(instance);
       instance.start();
 
-      return ResponseEntity.ok(java.util.Map.of(
-          "message", "Script started successfully.",
-          "scriptVersion", instance.getScriptVersion()));
+      return ResponseEntity.ok("Script started successfully.");
 
     } catch (ClassNotFoundException e) {
       logger.error("Script class not found: {}", e.getMessage());

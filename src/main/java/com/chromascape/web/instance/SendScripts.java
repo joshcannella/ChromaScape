@@ -5,6 +5,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,15 +26,13 @@ public class SendScripts {
   private static final Path SCRIPTS_DIR = Paths.get("src/main/java/com/chromascape/scripts");
 
   /**
-   * Returns a list of script file names located in the {@code scripts} directory.
+   * Returns a list of script entries with file name and version.
    *
-   * <p>This endpoint scans the directory recursively so nested folders are included in the results.
-   *
-   * @return a list of script file names relative to {@code SCRIPTS_DIR}
+   * @return list of maps with "name" and "version" keys
    * @throws IOException if an I/O error occurs while reading the directory
    */
   @GetMapping("/scripts")
-  public List<String> getScripts() throws IOException {
+  public List<Map<String, String>> getScripts() throws IOException {
     try (Stream<Path> stream = Files.walk(SCRIPTS_DIR)) {
       return stream
           .filter(Files::isRegularFile)
@@ -41,7 +40,18 @@ public class SendScripts {
           .map(SCRIPTS_DIR::relativize)
           .map(path -> path.toString().replace("\\", "/"))
           .sorted()
+          .map(name -> Map.of("name", name, "version", readVersion(name)))
           .collect(Collectors.toList());
+    }
+  }
+
+  private static String readVersion(String fileName) {
+    String className =
+        "com.chromascape.scripts." + fileName.replace(".java", "").replace("/", ".");
+    try {
+      return (String) Class.forName(className).getField("VERSION").get(null);
+    } catch (Exception e) {
+      return "";
     }
   }
 }
