@@ -70,7 +70,7 @@ public class BarbFishCookScript extends BaseScript {
   private static final int MAX_STUCK_CYCLES = 10;
 
   /** When true, drop all fish after cooking instead of banking. */
-  private static final boolean DROP_AFTER_COOK = false;
+  private static final boolean DROP_AFTER_COOK = true;
 
   private State state = State.FISHING;
   private int stuckCounter = 0;
