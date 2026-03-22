@@ -147,12 +147,17 @@ public class BarbFishCookScript extends BaseScript {
       checkInterrupted();
       if (Idler.waitUntilIdle(this, 3)) break;
       if (!ColourClick.isVisible(this, SPOT_COLOUR)) break;
+      Rectangle lastSlot = controller().zones().getInventorySlots().get(27);
+      BufferedImage slotImg = ScreenManager.captureZone(lastSlot);
+      if (TemplateMatching.match(RAW_TROUT, slotImg, THRESHOLD).success()
+          || TemplateMatching.match(RAW_SALMON, slotImg, THRESHOLD).success()) {
+        break;
+      }
       waitMillis(300);
     }
 
     waitMillis(HumanBehavior.adjustDelay(300, 500));
-    boolean hadDialog = LevelUpDismisser.dismissIfPresent(this);
-    if (hadDialog) waitMillis(HumanBehavior.adjustDelay(300, 500));
+    LevelUpDismisser.dismissIfPresent(this);
     Rectangle lastSlot = controller().zones().getInventorySlots().get(27);
     BufferedImage slotImg = ScreenManager.captureZone(lastSlot);
     if (TemplateMatching.match(RAW_TROUT, slotImg, THRESHOLD).success()
