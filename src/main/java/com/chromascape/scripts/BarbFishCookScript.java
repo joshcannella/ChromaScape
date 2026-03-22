@@ -13,8 +13,11 @@ import com.chromascape.utils.actions.custom.Logout;
 import com.chromascape.utils.actions.custom.Walk;
 import com.chromascape.utils.core.input.distribution.ClickDistribution;
 import com.chromascape.utils.core.screen.colour.ColourObj;
+import com.chromascape.utils.core.screen.topology.TemplateMatching;
+import com.chromascape.utils.core.screen.window.ScreenManager;
 import java.awt.Point;
 import java.awt.Rectangle;
+import java.awt.image.BufferedImage;
 import java.time.Duration;
 import java.time.Instant;
 import org.apache.logging.log4j.LogManager;
@@ -150,9 +153,11 @@ public class BarbFishCookScript extends BaseScript {
     waitMillis(HumanBehavior.adjustDelay(300, 500));
     boolean hadDialog = LevelUpDismisser.dismissIfPresent(this);
     if (hadDialog) waitMillis(HumanBehavior.adjustDelay(300, 500));
-    if (Inventory.countItem(this, RAW_TROUT, THRESHOLD)
-        + Inventory.countItem(this, RAW_SALMON, THRESHOLD) >= 26) {
-      logger.info("Inventory full. State: FISHING → COOK_TROUT");
+    Rectangle lastSlot = controller().zones().getInventorySlots().get(27);
+    BufferedImage slotImg = ScreenManager.captureZone(lastSlot);
+    if (TemplateMatching.match(RAW_TROUT, slotImg, THRESHOLD).success()
+        || TemplateMatching.match(RAW_SALMON, slotImg, THRESHOLD).success()) {
+      logger.info("Inventory full (fish in last slot). State: FISHING → COOK_TROUT");
       state = State.COOK_TROUT;
       stuckCounter = 0;
     }
