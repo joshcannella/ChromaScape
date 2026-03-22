@@ -17,7 +17,6 @@ public class ScriptInstance {
   private final BaseScript instance;
   private volatile Thread thread;
   private final WebSocketStateHandler stateHandler;
-  private final String scriptVersion;
 
   /**
    * Constructs a ScriptInstance by dynamically loading the script class specified in the config.
@@ -43,21 +42,6 @@ public class ScriptInstance {
     Class<?> script = Class.forName("com.chromascape.scripts." + className);
     Constructor<?> constructor = script.getDeclaredConstructor();
     instance = (BaseScript) constructor.newInstance();
-    scriptVersion = readVersion(script);
-  }
-
-  /** Reads the public static VERSION field from a script class, or returns "-" if absent. */
-  private static String readVersion(Class<?> script) {
-    try {
-      return (String) script.getField("VERSION").get(null);
-    } catch (NoSuchFieldException | IllegalAccessException e) {
-      return "-";
-    }
-  }
-
-  /** Returns the script's declared version, or "-" if none. */
-  public String getScriptVersion() {
-    return scriptVersion;
   }
 
   /**

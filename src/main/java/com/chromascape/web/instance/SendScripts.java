@@ -1,6 +1,8 @@
 package com.chromascape.web.instance;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -16,7 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
  * REST controller responsible for providing available script names.
  *
  * <p>This controller scans the {@code scripts} directory for available script files and returns
- * their names to the client.
+ * their names and git-derived versions to the client.
  */
 @RestController
 @RequestMapping("/api")
@@ -40,16 +42,22 @@ public class SendScripts {
           .map(SCRIPTS_DIR::relativize)
           .map(path -> path.toString().replace("\\", "/"))
           .sorted()
-          .map(name -> Map.of("name", name, "version", readVersion(name)))
+          .map(name -> Map.of("name", name, "version", gitVersion(SCRIPTS_DIR.resolve(name))))
           .collect(Collectors.toList());
     }
   }
 
-  private static String readVersion(String fileName) {
-    String className =
-        "com.chromascape.scripts." + fileName.replace(".java", "").replace("/", ".");
+  /** Returns the short git commit hash of the last commit that touched the given file. */
+  private static String gitVersion(Path file) {
     try {
-      return (String) Class.forName(className).getField("VERSION").get(null);
+      Process p = new ProcessBuilder("git", "log", "-1", "--format=%h", file.toString())
+          .redirectErrorStream(true)
+          .start();
+      try (BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
+        String hash = r.readLine();
+        p.waitFor();
+        return hash != null && !hash.isEmpty() ? hash : "";
+      }
     } catch (Exception e) {
       return "";
     }
