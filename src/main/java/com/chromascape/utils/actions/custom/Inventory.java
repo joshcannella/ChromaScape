@@ -150,7 +150,7 @@ public class Inventory {
 
   // "Click here to continue" blue: RGB(0, 0, 128) → HSV(120, 255, 128)
   private static final ColourObj DIALOG_BLUE =
-      new ColourObj("dialogBlue", new Scalar(118, 200, 100, 0), new Scalar(122, 255, 255, 0));
+      new ColourObj("dialogBlue", new Scalar(120, 254, 254, 0), new Scalar(121, 255, 255, 0));
 
   /**
    * Checks if a dialog is present in the chatbox (blue "Click here to continue" pixels).
