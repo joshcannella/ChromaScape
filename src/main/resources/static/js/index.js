@@ -153,7 +153,7 @@ function renderScriptList(scripts) {
             const statScript = document.getElementById("stat-script");
             if (statScript) {
                 statScript.innerHTML = script.replace("Script.java", "") +
-                    (version ? ' <span class="badge rounded-pill bg-info" style="font-size: 0.6rem; vertical-align: middle;">v' + version + '</span>' : "");
+                    (version ? ' <span class="badge rounded-pill bg-info ms-2" style="font-size: 0.6rem; vertical-align: middle;">v' + version + '</span>' : "");
             }
         });
     });
