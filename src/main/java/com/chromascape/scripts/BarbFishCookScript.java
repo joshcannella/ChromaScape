@@ -203,11 +203,14 @@ public class BarbFishCookScript extends BaseScript {
       waitMillis(HumanBehavior.adjustDelay(600, 900));
       if (Inventory.countItem(this, rawTemplate, THRESHOLD) < rawBefore) break;
     }
-    Idler.waitUntilIdle(this, 120);
-
-    waitMillis(HumanBehavior.adjustDelay(300, 500));
-    if (LevelUpDismisser.dismissIfPresent(this)) {
-      waitMillis(HumanBehavior.adjustDelay(300, 500));
+    // Wait for cooking to finish, dismissing level-up dialogs mid-cook
+    Instant idleDeadline = Instant.now().plus(Duration.ofSeconds(120));
+    while (Instant.now().isBefore(idleDeadline)) {
+      checkInterrupted();
+      if (Idler.waitUntilIdle(this, 5)) break;
+      if (LevelUpDismisser.dismissIfPresent(this)) {
+        waitMillis(HumanBehavior.adjustDelay(300, 500));
+      }
     }
 
     if (!Inventory.hasItem(this, rawTemplate, THRESHOLD)) {
