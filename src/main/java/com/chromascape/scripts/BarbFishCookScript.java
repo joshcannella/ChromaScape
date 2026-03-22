@@ -121,16 +121,6 @@ public class BarbFishCookScript extends BaseScript {
   }
 
   private void fish() {
-    // Check full inventory on entry — require at least 1 fish to avoid false positive on empty inv
-    boolean hasFish = Inventory.hasItem(this, RAW_TROUT, THRESHOLD)
-        || Inventory.hasItem(this, RAW_SALMON, THRESHOLD);
-    if (hasFish && Inventory.isFull(this, KNOWN_ITEMS, THRESHOLD)) {
-      logger.info("Inventory full. State: FISHING → COOK_TROUT");
-      state = State.COOK_TROUT;
-      stuckCounter = 0;
-      return;
-    }
-
     if (!ColourClick.isVisible(this, SPOT_COLOUR)) {
       logger.info("Spot not visible, walking.");
       if (!Walk.to(this, FISHING_TILE, "fishing spot")) stuckCounter++;
