@@ -119,9 +119,8 @@ public class BarbFishCookScript extends BaseScript {
   }
 
   private void fish() {
-    // Check full inventory on entry (handles starting with full inv)
-    if (Inventory.isFullByChat(this, CHAT_BLACK)
-        || Inventory.isFull(this, KNOWN_ITEMS, THRESHOLD)) {
+    // Check full inventory on entry — template-only, no chat OCR (stale "full" text causes false positives)
+    if (Inventory.isFull(this, KNOWN_ITEMS, THRESHOLD)) {
       logger.info("Inventory full. State: FISHING → COOK_TROUT");
       state = State.COOK_TROUT;
       stuckCounter = 0;
