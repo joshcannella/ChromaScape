@@ -51,8 +51,9 @@ public class BarbFishCookScript extends BaseScript {
   private static final String BURNT_FISH = "/images/user/Burnt_fish.png";
   private static final String ROD = "/images/user/Fly_fishing_rod.png";
   private static final String FEATHER = "/images/user/Feather.png";
+  private static final String FEATHER_STACK = "/images/user/Feather_stack.png";
   private static final String[] KNOWN_ITEMS =
-      {ROD, FEATHER, RAW_TROUT, RAW_SALMON, COOKED_TROUT, COOKED_SALMON, BURNT_FISH};
+      {ROD, FEATHER_STACK, RAW_TROUT, RAW_SALMON, COOKED_TROUT, COOKED_SALMON, BURNT_FISH};
 
   // === Colours ===
   private static final ColourObj SPOT_COLOUR =
@@ -95,7 +96,7 @@ public class BarbFishCookScript extends BaseScript {
         stop();
         return;
       }
-      if (!Inventory.hasItem(this, FEATHER, THRESHOLD)) {
+      if (!Inventory.hasItem(this, FEATHER_STACK, THRESHOLD)) {
         logger.error("No feathers.");
         DiscordNotification.send("BarbFishCook: No feathers. Stopping.");
         stop();
@@ -287,7 +288,7 @@ public class BarbFishCookScript extends BaseScript {
     Bank.depositAll(this);
     waitMillis(HumanBehavior.adjustDelay(300, 500));
 
-    for (String[] tool : new String[][]{{ROD, "rod"}, {FEATHER, "feathers"}}) {
+    for (String[] tool : new String[][]{{ROD, "rod"}, {FEATHER_STACK, "feathers"}}) {
       Point loc = Inventory.findInGameView(this, tool[0], THRESHOLD);
       if (loc == null) {
         logger.error("{} not found in bank.", tool[1]);
