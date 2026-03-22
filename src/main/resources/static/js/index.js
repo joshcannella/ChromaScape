@@ -52,6 +52,12 @@ async function initializeUI() {
 
     setupWindowModeDropdown();
     setupStartStopButton();
+
+    const savedLabel = sessionStorage.getItem("statScript");
+    if (savedLabel) {
+        const el = document.getElementById("stat-script");
+        if (el) el.innerHTML = savedLabel;
+    }
 }
 
 // ----------------- CONTROL STATE MANAGEMENT -----------------
@@ -334,6 +340,8 @@ async function startScript(config) {
         body: JSON.stringify(config)
     });
     if (!res.ok) throw new Error("Failed to start script");
+    const label = document.getElementById("stat-script")?.innerHTML;
+    if (label) sessionStorage.setItem("statScript", label);
     // Trigger a full page reload to ensure fresh state (clear logs, reset UI)
     window.location.reload();
 }
@@ -350,6 +358,7 @@ async function stopScript() {
     });
     if (!res.ok) throw new Error("Failed to stop script");
     isStarted = false;
+    sessionStorage.removeItem("statScript");
 }
 
 /**
